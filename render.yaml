@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: taskpulse-ai-node
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
