@@ -6,12 +6,9 @@ import datetime
 from fastapi import FastAPI, Form, HTTPException
 import uvicorn
 
-# Add python subfolder to sys.path to access audio_recorder & speech engines
+# Add current directory to sys.path to access audio_recorder & speech engines
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR = os.path.dirname(BASE_DIR)
-PYTHON_DIR = os.path.join(PARENT_DIR, "python")
-sys.path.append(PYTHON_DIR)
-sys.path.append(PARENT_DIR)
+sys.path.append(BASE_DIR)
 
 from audio_recorder import DualAudioRecorder
 from local_speech_engine import LocalSpeechEngine
