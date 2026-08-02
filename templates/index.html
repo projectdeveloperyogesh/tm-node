@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskPulse AI (Node.js) - Dual Audio Meeting Recorder & Task Extractor</title>
+    <!-- Google Fonts with Devanagari (Hindi) Support -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome / Feather Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i data-lucide="mic-vocal"></i>
+                </div>
+                <div>
+                    <h1 class="logo-title">TaskPulse <span class="accent-text">AI (Node)</span></h1>
+                    <p class="logo-subtitle">Express Dual Audio Recorder & Task Extractor</p>
+                </div>
+            </div>
+
+            <div class="header-stats">
+                <div class="stat-badge">
+                    <i data-lucide="radio" class="pulse-icon"></i>
+                    <span id="recordingStatusPill">Ready</span>
+                </div>
+                <div class="stat-badge">
+                    <i data-lucide="check-square"></i>
+                    <span id="totalTasksCount">0 Tasks</span>
+                </div>
+                <button class="icon-btn" id="openSettingsBtn" title="Settings">
+                    <i data-lucide="settings"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Tab Navigation -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="recorderTab">
+                <i data-lucide="mic"></i> Live Recorder
+            </button>
+            <button class="nav-tab" data-tab="uploaderTab">
+                <i data-lucide="upload-cloud"></i> Media Upload
+            </button>
+            <button class="nav-tab" data-tab="insightsTab">
+                <i data-lucide="sparkles"></i> Summary & Insights
+            </button>
+            <button class="nav-tab" data-tab="taskBoardTab">
+                <i data-lucide="kanban"></i> Action Task Board
+            </button>
+            <button class="nav-tab" data-tab="historyTab">
+                <i data-lucide="folder-archive"></i> Meeting History
+            </button>
+        </nav>
+
+        <!-- Main Content View Areas -->
+        <main class="content-area">
+            
+            <!-- TAB 1: LIVE RECORDER -->
+            <section id="recorderTab" class="tab-content active">
+                <div class="grid-layout-2col">
+                    <!-- Left: Recording Controls -->
+                    <div class="glass-card recording-panel">
+                        <div class="card-header">
+                            <h2><i data-lucide="disc"></i> Live Dual Audio Recording</h2>
+                            <p>Records internal microphone & speaker audio simultaneously</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label><i data-lucide="file-text"></i> Meeting Session Title</label>
+                            <input type="text" id="meetingTitleInput" class="custom-input" placeholder="e.g. Weekly Product Strategy Sync">
+                        </div>
+
+                        <div class="form-group margin-top-10">
+                            <label><i data-lucide="radio"></i> Recording Engine Mode</label>
+                            <select id="recordingEngineSelect" class="custom-select">
+                                <option value="desktop" selected>💻 Desktop Dual Audio (Mic + Speaker System Sound)</option>
+                                <option value="web">🌐 Web Browser Audio Capture (Cloud Server Mode)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group margin-top-10">
+                            <label><i data-lucide="languages"></i> Summary & Task Language</label>
+                            <select id="recorderLanguageSelect" class="custom-select">
+                                <option value="English" selected>English</option>
+                                <option value="Hindi">Hindi (हिंदी)</option>
+                                <option value="Hinglish">Hinglish (Hindi + English Mix)</option>
+                                <option value="Spanish">Spanish (Español)</option>
+                                <option value="French">French (Français)</option>
+                                <option value="German">German (Deutsch)</option>
+                            </select>
+                        </div>
+
+                        <div class="device-selectors">
+                            <div class="form-group">
+                                <label><i data-lucide="mic"></i> Microphone (Your Voice)</label>
+                                <select id="micSelect" class="custom-select"></select>
+                            </div>
+                            <div class="form-group">
+                                <label><i data-lucide="volume-2"></i> Speaker / System Audio</label>
+                                <select id="speakerSelect" class="custom-select"></select>
+                            </div>
+                        </div>
+
+                        <div class="recording-timer-container">
+                            <div class="timer-display" id="recordingTimer">00:00:00</div>
+                            <div class="timer-label" id="timerStatusLabel">Standby</div>
+                        </div>
+
+                        <div class="recorder-controls">
+                            <button id="startRecordBtn" class="btn btn-primary btn-glow">
+                                <i data-lucide="play"></i> Start Recording
+                            </button>
+                            <button id="pauseRecordBtn" class="btn btn-warning" disabled>
+                                <i data-lucide="pause"></i> Pause
+                            </button>
+                            <button id="stopRecordBtn" class="btn btn-danger" disabled>
+                                <i data-lucide="square"></i> Stop & Process
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Audio Meters & Waveform Visualizer -->
+                    <div class="glass-card visualizer-panel">
+                        <div class="card-header">
+                            <h2><i data-lucide="activity"></i> Dual Sound Level Gauges</h2>
+                            <p>Real-time decibel volume meters for Mic & Speaker</p>
+                        </div>
+
+                        <div class="meter-group">
+                            <div class="meter-header">
+                                <span><i data-lucide="mic"></i> Microphone Input Level</span>
+                                <span id="micLevelVal">0%</span>
+                            </div>
+                            <div class="meter-bar-container">
+                                <div class="meter-bar mic-bar" id="micLevelBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="meter-group">
+                            <div class="meter-header">
+                                <span><i data-lucide="volume-2"></i> Speaker / System Audio Level</span>
+                                <span id="speakerLevelVal">0%</span>
+                            </div>
+                            <div class="meter-bar-container">
+                                <div class="meter-bar speaker-bar" id="speakerLevelBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="waveform-box">
+                            <canvas id="waveformCanvas"></canvas>
+                        </div>
+
+                        <!-- Real-Time Live Transcript Feed -->
+                        <div class="live-transcript-container margin-top-20">
+                            <div class="card-header flex-between">
+                                <span class="text-sm font-semibold"><i data-lucide="radio" class="pulse-icon"></i> Live Speech Stream</span>
+                                <span class="badge badge-category" id="liveSpeakerTag">Mic + Speaker Active</span>
+                            </div>
+                            <div id="liveTranscriptFeed" class="live-transcript-feed">
+                                <p class="empty-state-sm">Live transcript dialogue will stream here as you & meeting participants speak...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: MEDIA UPLOADER -->
+            <section id="uploaderTab" class="tab-content">
+                <div class="glass-card uploader-container">
+                    <div class="card-header text-center">
+                        <h2><i data-lucide="file-up"></i> Upload Audio or Video File</h2>
+                        <p>Upload meeting recordings (MP3, WAV, M4A, OGG, MP4, MKV, AVI, WEBM, MOV)</p>
+                    </div>
+
+                    <div class="upload-dropzone" id="dropzone">
+                        <div class="dropzone-icon">
+                            <i data-lucide="upload-cloud"></i>
+                        </div>
+                        <h3>Drag & Drop Audio / Video File Here</h3>
+                        <p>or click to select from your computer</p>
+                        <input type="file" id="mediaFileInput" accept="audio/*,video/*" class="file-input-hidden">
+                    </div>
+
+                    <div class="selected-file-card hidden" id="selectedFileCard">
+                        <div class="file-info">
+                            <i data-lucide="file-audio" id="fileIcon"></i>
+                            <div>
+                                <h4 id="fileName">file_name.mp4</h4>
+                                <span id="fileSize">0 MB</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline" id="clearFileBtn"><i data-lucide="x"></i> Clear</button>
+                    </div>
+
+                    <div class="form-group margin-top-15">
+                        <label><i data-lucide="tag"></i> Meeting Session Title</label>
+                        <input type="text" id="uploadTitleInput" class="custom-input" placeholder="e.g. Client Design Presentation">
+                    </div>
+
+                    <div class="form-group margin-top-15">
+                        <label><i data-lucide="languages"></i> Summary & Task Language</label>
+                        <select id="uploadLanguageSelect" class="custom-select">
+                            <option value="English" selected>English</option>
+                            <option value="Hindi">Hindi (हिंदी)</option>
+                            <option value="Hinglish">Hinglish (Hindi + English Mix)</option>
+                            <option value="Spanish">Spanish (Español)</option>
+                            <option value="French">French (Français)</option>
+                            <option value="German">German (Deutsch)</option>
+                        </select>
+                    </div>
+
+                    <div class="text-center margin-top-20">
+                        <button id="processUploadBtn" class="btn btn-primary btn-glow btn-lg" disabled>
+                            <i data-lucide="cpu"></i> Extract Speech & Generate Task Actions
+                        </button>
+                    </div>
+
+                    <div id="uploadProgress" class="progress-bar-box hidden">
+                        <div class="progress-bar-fill" id="uploadProgressFill"></div>
+                        <span id="uploadProgressText">Processing file...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: MEETING SUMMARY & INSIGHTS -->
+            <section id="insightsTab" class="tab-content">
+                <div class="session-selector-bar glass-card flex-between flex-wrap gap-15">
+                    <div class="flex-align-center gap-10 flex-grow-1">
+                        <label><i data-lucide="layers"></i> Selected Session:</label>
+                        <select id="meetingSessionSelect" class="custom-select"></select>
+                    </div>
+                    <div class="flex-align-center gap-10">
+                        <label><i data-lucide="languages"></i> Language:</label>
+                        <select id="insightsLanguageSelect" class="custom-select" style="min-width: 140px;">
+                            <option value="English">English</option>
+                            <option value="Hindi">Hindi (हिंदी)</option>
+                            <option value="Hinglish">Hinglish (Hindi-English Mix)</option>
+                            <option value="Spanish">Spanish (Español)</option>
+                            <option value="French">French (Français)</option>
+                            <option value="German">German (Deutsch)</option>
+                        </select>
+                        <button id="reanalyzeBtn" class="btn btn-secondary btn-sm" title="Translate summary & action list into selected language">
+                            <i data-lucide="refresh-cw"></i> Translate / Regenerate
+                        </button>
+                        <button id="deleteAllMeetingsBtn" class="btn btn-danger btn-sm" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" title="Delete all meeting recordings and history">
+                            <i data-lucide="trash-2"></i> Delete All
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid-layout-2col margin-top-20">
+                    <!-- Left: Executive Summary & Items Discussed -->
+                    <div class="insights-left">
+                        <div class="glass-card summary-card">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="sparkles" class="accent-icon"></i> Executive Summary</h2>
+                                <span class="badge badge-category" id="summaryLangBadge">Language: English</span>
+                            </div>
+                            <p id="summaryContent" class="summary-text">Select or complete a meeting session to view the executive summary.</p>
+                        </div>
+
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header">
+                                <h2><i data-lucide="list-checks" class="accent-icon"></i> List of Items & Topics Discussed</h2>
+                            </div>
+                            <div id="itemsDiscussedContainer" class="items-list">
+                                <p class="empty-state">No items discussed extracted yet.</p>
+                            </div>
+                        </div>
+
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="check-square" class="accent-icon"></i> Extracted Action Items & Tasks</h2>
+                                <span class="badge badge-primary" id="insightsTaskCount">0 Actions</span>
+                            </div>
+                            <div id="insightsTasksContainer" class="items-list">
+                                <p class="empty-state">No action items extracted for this session.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Transcript & Audio Player -->
+                    <div class="insights-right">
+                        <div class="glass-card audio-player-card">
+                            <div class="card-header">
+                                <h2><i data-lucide="music"></i> Audio Playback</h2>
+                            </div>
+                            <audio id="meetingAudioPlayer" controls class="custom-audio-player"></audio>
+                        </div>
+
+                        <div class="glass-card margin-top-20 transcript-card">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="file-text"></i> Meeting Transcript</h2>
+                                <input type="text" id="transcriptSearchInput" class="custom-input search-sm" placeholder="Search transcript...">
+                            </div>
+                            <div id="transcriptContainer" class="transcript-box">
+                                <p class="empty-state">Transcript will appear here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: ACTION TASK BOARD -->
+            <section id="taskBoardTab" class="tab-content">
+                <div class="board-header glass-card flex-between">
+                    <div>
+                        <h2><i data-lucide="check-square" class="accent-icon"></i> Meeting Action Tasks</h2>
+                        <p>Actionable items automatically generated from meeting recordings & uploads</p>
+                    </div>
+
+                    <div class="board-actions">
+                        <input type="text" id="taskSearchInput" class="custom-input" placeholder="Search tasks...">
+                        <select id="priorityFilter" class="custom-select filter-select">
+                            <option value="all">All Priorities</option>
+                            <option value="High">High Priority</option>
+                            <option value="Medium">Medium Priority</option>
+                            <option value="Low">Low Priority</option>
+                        </select>
+                        <select id="statusFilter" class="custom-select filter-select">
+                            <option value="all">All Statuses</option>
+                            <option value="todo">To Do</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                        <button class="btn btn-primary" id="openNewTaskBtn">
+                            <i data-lucide="plus"></i> Add Task
+                        </button>
+                        <div class="dropdown">
+                            <button class="btn btn-outline" id="exportBtn">
+                                <i data-lucide="download"></i> Export <i data-lucide="chevron-down"></i>
+                            </button>
+                            <div class="dropdown-menu hidden" id="exportMenu">
+                                <button id="exportMdBtn"><i data-lucide="file-code"></i> Markdown Report</button>
+                                <button id="exportCsvBtn"><i data-lucide="table"></i> CSV File</button>
+                                <button id="exportJsonBtn"><i data-lucide="file-json"></i> JSON Data</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kanban Task Columns -->
+                <div class="kanban-grid margin-top-20">
+                    <div class="kanban-column" data-status="todo">
+                        <div class="column-header column-todo">
+                            <span><i data-lucide="circle"></i> To Do</span>
+                            <span class="task-count-pill" id="todoCount">0</span>
+                        </div>
+                        <div class="task-list" id="todoTaskList"></div>
+                    </div>
+
+                    <div class="kanban-column" data-status="in_progress">
+                        <div class="column-header column-progress">
+                            <span><i data-lucide="clock"></i> In Progress</span>
+                            <span class="task-count-pill" id="progressCount">0</span>
+                        </div>
+                        <div class="task-list" id="progressTaskList"></div>
+                    </div>
+
+                    <div class="kanban-column" data-status="completed">
+                        <div class="column-header column-completed">
+                            <span><i data-lucide="check-circle-2"></i> Completed</span>
+                            <span class="task-count-pill" id="completedCount">0</span>
+                        </div>
+                        <div class="task-list" id="completedTaskList"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: MEETING HISTORY -->
+            <section id="historyTab" class="tab-content">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <h2><i data-lucide="history"></i> Meeting Sessions History</h2>
+                        <p>Access past recorded and uploaded meeting sessions</p>
+                    </div>
+
+                    <div id="historyListContainer" class="history-grid">
+                        <p class="empty-state">No saved meetings found.</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Task Edit/Create Modal -->
+    <div class="modal-overlay hidden" id="taskModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalTitle">Edit Action Task</h3>
+                <button class="icon-btn" id="closeTaskModalBtn"><i data-lucide="x"></i></button>
+            </div>
+            <form id="taskForm">
+                <input type="hidden" id="taskIdInput">
+                <div class="form-group">
+                    <label>Task Title</label>
+                    <input type="text" id="taskTitleInput" class="custom-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="taskDescInput" class="custom-textarea" rows="3"></textarea>
+                </div>
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label>Assignee</label>
+                        <input type="text" id="taskAssigneeInput" class="custom-input" placeholder="e.g. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select id="taskPriorityInput" class="custom-select">
+                            <option value="High">High</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="taskCategoryInput" class="custom-select">
+                            <option value="Technical">Technical</option>
+                            <option value="Follow-up">Follow-up</option>
+                            <option value="Decision">Decision</option>
+                            <option value="Documentation">Documentation</option>
+                            <option value="Research">Research</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Due Date</label>
+                        <input type="text" id="taskDueDateInput" class="custom-input" placeholder="e.g. YYYY-MM-DD or Next Week">
+                    </div>
+                </div>
+                <div class="modal-footer margin-top-20">
+                    <button type="button" class="btn btn-outline" id="cancelTaskModalBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Task Action</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay hidden" id="settingsModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i data-lucide="settings"></i> Application Settings</h3>
+                <button class="icon-btn" id="closeSettingsModalBtn"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-group">
+                <label><i data-lucide="key"></i> Google Gemini API Key (Optional)</label>
+                <input type="password" id="geminiApiKeyInput" class="custom-input" placeholder="AIzaSy...">
+                <small class="help-text">Leave blank to use 100% offline local NLP engine. Enter key for cloud LLM reasoning.</small>
+            </div>
+            <div class="modal-footer margin-top-20">
+                <button type="button" class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

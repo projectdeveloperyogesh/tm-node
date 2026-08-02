@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+recordings/*
+!recordings/.gitkeep
+uploads/*
+!uploads/.gitkeep
+processed/*
+!processed/.gitkeep
+data/*
+!data/.gitkeep
+.env
+.DS_Store
