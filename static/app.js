@@ -1325,6 +1325,27 @@ document.addEventListener('DOMContentLoaded', () => {
         openSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
         closeSettingsModalBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
 
+        const autoInstallOllamaBtn = document.getElementById('autoInstallOllamaBtn');
+        if (autoInstallOllamaBtn) {
+            autoInstallOllamaBtn.addEventListener('click', async () => {
+                autoInstallOllamaBtn.disabled = true;
+                autoInstallOllamaBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Setting up Ollama...';
+                try {
+                    const formData = new FormData();
+                    formData.append('model_name', 'llama3.2');
+                    const res = await fetch('/api/ollama/setup', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    alert(`🦙 ${data.message || 'Ollama setup triggered successfully!'}`);
+                } catch (e) {
+                    alert('Ollama auto-setup error: ' + e);
+                } finally {
+                    autoInstallOllamaBtn.disabled = false;
+                    autoInstallOllamaBtn.innerHTML = '<i data-lucide="download-cloud"></i> Auto-Install / Start Ollama';
+                    lucide.createIcons();
+                }
+            });
+        }
+
         saveSettingsBtn.addEventListener('click', async () => {
             const provider = document.getElementById('aiProviderSelect').value;
             const geminiKey = document.getElementById('geminiApiKeyInput').value.trim();

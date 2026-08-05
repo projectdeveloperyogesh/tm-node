@@ -504,8 +504,13 @@
 
             <div class="form-group margin-top-15">
                 <label><i data-lucide="server"></i> Ollama Host Endpoint URL (Local GPU/CPU)</label>
-                <input type="text" id="ollamaHostInput" class="custom-input" placeholder="http://localhost:11434">
-                <small class="help-text">Run `ollama run llama3.2` on your machine.</small>
+                <div class="flex-align-center gap-10">
+                    <input type="text" id="ollamaHostInput" class="custom-input flex-grow-1" placeholder="http://localhost:11434">
+                    <button type="button" id="autoInstallOllamaBtn" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
+                        <i data-lucide="download-cloud"></i> Auto-Install / Start Ollama
+                    </button>
+                </div>
+                <small class="help-text">Click 'Auto-Install / Start' to download, setup & launch Ollama and Llama 3.2 automatically!</small>
             </div>
 
             <div class="modal-footer margin-top-20">

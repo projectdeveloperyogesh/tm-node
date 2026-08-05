@@ -530,6 +530,27 @@ app.delete('/api/tasks/:id', (req, res) => {
     res.json({ status: "deleted", task_id: req.params.id });
 });
 
+// Ollama Auto-Setup APIs
+app.get('/api/ollama/status', (req, res) => {
+    const { exec } = require('child_process');
+    exec('python -c "import ollama_installer; print(ollama_installer.is_ollama_running())"', (err, stdout) => {
+        const isRunning = stdout.trim() === 'True';
+        res.json({ running: isRunning });
+    });
+});
+
+app.post('/api/ollama/setup', (req, res) => {
+    const { exec } = require('child_process');
+    const model = req.body.model_name || "llama3.2";
+    exec(`python -c "import ollama_installer, json; print(json.dumps(ollama_installer.auto_setup_ollama('${model}')))"`, (err, stdout) => {
+        try {
+            res.json(JSON.parse(stdout.trim()));
+        } catch (e) {
+            res.json({ status: "installing", message: "Auto-setup command sent to background." });
+        }
+    });
+});
+
 // Settings APIs
 app.get('/api/settings', (req, res) => {
     const settings = loadJson(SETTINGS_FILE, {});
