@@ -256,6 +256,9 @@
                         <button id="reanalyzeBtn" class="btn btn-secondary btn-sm" title="Translate summary & action list into selected language">
                             <i data-lucide="refresh-cw"></i> Translate / Regenerate
                         </button>
+                        <button id="copyAllInsightsBtn" class="btn btn-secondary btn-sm" title="Copy full session notes, summary, and action items to clipboard">
+                            <i data-lucide="copy"></i> Copy All Notes
+                        </button>
                         <button id="deleteAllMeetingsBtn" class="btn btn-danger btn-sm" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171;" title="Delete all meeting recordings and history">
                             <i data-lucide="trash-2"></i> Delete All
                         </button>
@@ -268,7 +271,10 @@
                         <div class="glass-card summary-card">
                             <div class="card-header flex-between">
                                 <h2><i data-lucide="sparkles" class="accent-icon"></i> Executive Summary</h2>
-                                <span class="badge badge-category" id="summaryLangBadge">Language: English</span>
+                                <div class="flex-align-center gap-10">
+                                    <button id="copySummaryBtn" class="btn btn-secondary btn-xs" title="Copy Summary Text"><i data-lucide="copy"></i> Copy Summary</button>
+                                    <span class="badge badge-category" id="summaryLangBadge">Language: English</span>
+                                </div>
                             </div>
                             <p id="summaryContent" class="summary-text">Select or complete a meeting session to view the executive summary.</p>
                         </div>
@@ -285,7 +291,10 @@
                         <div class="glass-card margin-top-20">
                             <div class="card-header flex-between">
                                 <h2><i data-lucide="check-square" class="accent-icon"></i> Extracted Action Items & Tasks</h2>
-                                <span class="badge badge-primary" id="insightsTaskCount">0 Actions</span>
+                                <div class="flex-align-center gap-10">
+                                    <button id="copyInsightsTasksBtn" class="btn btn-secondary btn-xs" title="Copy Action Item Tasks"><i data-lucide="copy"></i> Copy Tasks</button>
+                                    <span class="badge badge-primary" id="insightsTaskCount">0 Actions</span>
+                                </div>
                             </div>
                             <div id="insightsTasksContainer" class="items-list">
                                 <p class="empty-state">No action items extracted for this session.</p>
@@ -305,7 +314,10 @@
                         <div class="glass-card margin-top-20 transcript-card">
                             <div class="card-header flex-between">
                                 <h2><i data-lucide="file-text"></i> Meeting Transcript</h2>
-                                <input type="text" id="transcriptSearchInput" class="custom-input search-sm" placeholder="Search transcript...">
+                                <div class="flex-align-center gap-10">
+                                    <button id="copyTranscriptBtn" class="btn btn-secondary btn-xs" title="Copy Full Transcript"><i data-lucide="copy"></i> Copy Transcript</button>
+                                    <input type="text" id="transcriptSearchInput" class="custom-input search-sm" placeholder="Search transcript...">
+                                </div>
                             </div>
                             <div id="transcriptContainer" class="transcript-box">
                                 <p class="empty-state">Transcript will appear here.</p>

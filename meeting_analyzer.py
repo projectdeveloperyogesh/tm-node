@@ -38,6 +38,9 @@ class MeetingAnalyzer:
                 - If target_language is 'English', write in clear, professional English.
                 - Otherwise, translate and write in {target_language}.
 
+                TASK EXTRACTION INSTRUCTION:
+                You MUST extract AT LEAST 3 to 6 comprehensive, actionable tasks from the meeting transcript covering different aspects (Technical Implementation, Follow-up Review, Documentation, Testing/QA, Timeline Updates). Do NOT return only 1 task.
+
                 Return ONLY a JSON object with this exact schema:
                 {{
                     "summary": "Executive summary paragraph written in {target_language}...",
@@ -50,13 +53,31 @@ class MeetingAnalyzer:
                     ],
                     "tasks": [
                         {{
-                            "title": "Clear action task title in {target_language}",
+                            "title": "Action Task 1 (Primary Objective) in {target_language}",
                             "description": "Detailed task description in {target_language}",
                             "assignee": "Assignee name or Unassigned",
                             "priority": "High | Medium | Low",
                             "category": "Technical | Follow-up | Decision | Research | Documentation",
                             "due_date": "YYYY-MM-DD or Next Week",
-                            "subtasks": ["Subtask 1 in {target_language}", "Subtask 2 in {target_language}"]
+                            "subtasks": ["Subtask 1", "Subtask 2"]
+                        }},
+                        {{
+                            "title": "Action Task 2 (Review & Follow-up) in {target_language}",
+                            "description": "Detailed task description in {target_language}",
+                            "assignee": "Assignee name or Unassigned",
+                            "priority": "High | Medium | Low",
+                            "category": "Follow-up | Technical | Research",
+                            "due_date": "YYYY-MM-DD or Next Week",
+                            "subtasks": ["Subtask 1", "Subtask 2"]
+                        }},
+                        {{
+                            "title": "Action Task 3 (Documentation & Testing) in {target_language}",
+                            "description": "Detailed task description in {target_language}",
+                            "assignee": "Assignee name or Unassigned",
+                            "priority": "High | Medium | Low",
+                            "category": "Documentation | Decision | Research",
+                            "due_date": "YYYY-MM-DD or Next Week",
+                            "subtasks": ["Subtask 1", "Subtask 2"]
                         }}
                     ]
                 }}
@@ -90,7 +111,7 @@ class MeetingAnalyzer:
         return self._local_nlp_analysis(transcript_text, meeting_title, target_language=target_language)
 
     def _local_nlp_analysis(self, transcript_text, meeting_title, target_language="English"):
-        """100% Offline NLP Heuristic Meeting Analysis Engine with full Hindi & Hinglish support."""
+        """100% Offline NLP Heuristic Meeting Analysis Engine with multi-task generation & full Hindi/Hinglish support."""
         sentences = [s.strip() for s in re.split(r'[.!?]+', transcript_text) if len(s.strip()) > 3]
 
         if target_language == "Hindi":
@@ -156,7 +177,7 @@ class MeetingAnalyzer:
                 "category": "Discussion"
             })
 
-        # 3. Action Task Extraction
+        # 3. Multi-Action Task Extraction
         tasks = []
         action_verbs = ["create", "build", "fix", "implement", "update", "send", "review", "schedule", "test", "deploy", "setup", "prepare", "check", "organize", "call", "email", "complete", "need", "must", "should"]
         
@@ -200,49 +221,85 @@ class MeetingAnalyzer:
                     ]
                 })
 
-        if not tasks:
+        # Ensure AT LEAST 3 to 4 structured action items are generated
+        if len(tasks) < 3:
             if target_language == "Hindi":
-                tasks.append({
-                    "id": str(uuid.uuid4())[:8],
-                    "title": f"कार्यवाही बिंदु: {meeting_title} की समीक्षा और फॉलो-अप",
-                    "description": f"बैठक के बाद {meeting_title} पर आवश्यक कदम उठाएं।",
-                    "assignee": "Unassigned",
-                    "priority": "Medium",
-                    "category": "Follow-up",
-                    "due_date": "Next Week",
-                    "status": "todo",
-                    "subtasks": [
-                        {"id": "sub_def_1", "title": "कार्यों की समीक्षा करें", "completed": False}
-                    ]
-                })
+                default_tasks = [
+                    {
+                        "title": f"मुख्य कार्य: {meeting_title} का क्रियान्वयन",
+                        "description": f"बैठक सत्र '{meeting_title}' में तय किए गए मुख्य तकनीकी बिंदुओं को पूरा करें।",
+                        "priority": "High", "category": "Technical", "due_date": "This Week",
+                        "subtasks": [{"id": "st1", "title": "आवश्यक संसाधनों की समीक्षा करें", "completed": False}]
+                    },
+                    {
+                        "title": f"फॉलो-अप कार्य: टीम सिंक और प्रगति समीक्षा",
+                        "description": f"{meeting_title} के बाद शेयर किए गए फीडबैक और अपडेट पर टीम से चर्चा करें।",
+                        "priority": "Medium", "category": "Follow-up", "due_date": "Next Week",
+                        "subtasks": [{"id": "st2", "title": "समीक्षा बैठक आयोजित करें", "completed": False}]
+                    },
+                    {
+                        "title": f"दस्तावेज़ीकरण: {meeting_title} का सारांश और नोट्स अपडेट",
+                        "description": "टीम रिपॉजिटरी और प्रोजेक्ट बोर्ड में बैठक के मुख्य बिंदुओं को रिकॉर्ड करें।",
+                        "priority": "Low", "category": "Documentation", "due_date": "Next Week",
+                        "subtasks": [{"id": "st3", "title": "नोट्स आर्काइव करें", "completed": False}]
+                    }
+                ]
             elif target_language == "Hinglish":
-                tasks.append({
-                    "id": str(uuid.uuid4())[:8],
-                    "title": f"Action Item: {meeting_title} ka review aur follow-up",
-                    "description": f"Meeting ke baad {meeting_title} par necessary steps lein.",
-                    "assignee": "Unassigned",
-                    "priority": "Medium",
-                    "category": "Follow-up",
-                    "due_date": "Next Week",
-                    "status": "todo",
-                    "subtasks": [
-                        {"id": "sub_def_1", "title": "Tasks review karein", "completed": False}
-                    ]
-                })
+                default_tasks = [
+                    {
+                        "title": f"Primary Action: {meeting_title} ka implementation",
+                        "description": f"Meeting '{meeting_title}' mein discuss kiye gaye main tasks complete karein.",
+                        "priority": "High", "category": "Technical", "due_date": "This Week",
+                        "subtasks": [{"id": "st1", "title": "Requirements check karein", "completed": False}]
+                    },
+                    {
+                        "title": f"Follow-up: {meeting_title} team review",
+                        "description": f"{meeting_title} ke action items aur deliverables team ke saath verify karein.",
+                        "priority": "Medium", "category": "Follow-up", "due_date": "Next Week",
+                        "subtasks": [{"id": "st2", "title": "Follow-up sync organize karein", "completed": False}]
+                    },
+                    {
+                        "title": f"Documentation: {meeting_title} notes update",
+                        "description": "Project board par meeting outcomes aur action tasks log karein.",
+                        "priority": "Low", "category": "Documentation", "due_date": "Next Week",
+                        "subtasks": [{"id": "st3", "title": "Task board update karein", "completed": False}]
+                    }
+                ]
             else:
-                tasks.append({
-                    "id": str(uuid.uuid4())[:8],
-                    "title": f"Action Item: Review and follow-up on {meeting_title}",
-                    "description": f"Perform required follow-up steps for {meeting_title}.",
-                    "assignee": "Unassigned",
-                    "priority": "Medium",
-                    "category": "Follow-up",
-                    "due_date": "Next Week",
-                    "status": "todo",
-                    "subtasks": [
-                        {"id": "sub_def_1", "title": "Review action items", "completed": False}
-                    ]
-                })
+                default_tasks = [
+                    {
+                        "title": f"Primary Task: Complete core deliverables for {meeting_title}",
+                        "description": f"Implement main action items and technical objectives discussed during {meeting_title}.",
+                        "priority": "High", "category": "Technical", "due_date": "This Week",
+                        "subtasks": [{"id": "st1", "title": "Review core requirements", "completed": False}]
+                    },
+                    {
+                        "title": f"Follow-up: Team alignment and progress review for {meeting_title}",
+                        "description": f"Coordinate with team members on key decisions made in {meeting_title}.",
+                        "priority": "Medium", "category": "Follow-up", "due_date": "Next Week",
+                        "subtasks": [{"id": "st2", "title": "Schedule progress follow-up sync", "completed": False}]
+                    },
+                    {
+                        "title": f"Documentation: Update project board with {meeting_title} outcomes",
+                        "description": "Log meeting decisions, deadlines, and assigned responsibilities into the team repository.",
+                        "priority": "Low", "category": "Documentation", "due_date": "Next Week",
+                        "subtasks": [{"id": "st3", "title": "Archive meeting notes and tasks", "completed": False}]
+                    }
+                ]
+
+            for dt in default_tasks:
+                if not any(t["title"] == dt["title"] for t in tasks):
+                    tasks.append({
+                        "id": str(uuid.uuid4())[:8],
+                        "title": dt["title"],
+                        "description": dt["description"],
+                        "assignee": "Unassigned",
+                        "priority": dt["priority"],
+                        "category": dt["category"],
+                        "due_date": dt["due_date"],
+                        "status": "todo",
+                        "subtasks": dt["subtasks"]
+                    })
 
         return {
             "summary": summary,

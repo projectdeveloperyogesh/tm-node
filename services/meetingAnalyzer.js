@@ -36,6 +36,9 @@ class MeetingAnalyzer {
                 - If target_language is 'English', write in clear, professional English.
                 - Otherwise, translate and write in ${targetLanguage}.
 
+                TASK EXTRACTION INSTRUCTION:
+                You MUST extract AT LEAST 3 to 6 comprehensive, actionable tasks from the meeting recording covering different aspects (Technical Implementation, Follow-up Review, Documentation, Testing/QA, Timeline Updates). Do NOT return only 1 task.
+
                 Return ONLY a valid JSON object matching this exact schema:
                 {
                     "transcript": "Full verbatim transcript of everything spoken in the audio...",
@@ -49,13 +52,31 @@ class MeetingAnalyzer {
                     ],
                     "tasks": [
                         {
-                            "title": "Clear action task title in ${targetLanguage}",
+                            "title": "Action Task 1 (Primary Objective) in ${targetLanguage}",
                             "description": "Detailed task description in ${targetLanguage}",
                             "assignee": "Assignee name or Unassigned",
                             "priority": "High | Medium | Low",
                             "category": "Technical | Follow-up | Decision | Research | Documentation",
                             "due_date": "YYYY-MM-DD or Next Week",
-                            "subtasks": ["Subtask 1 in ${targetLanguage}", "Subtask 2 in ${targetLanguage}"]
+                            "subtasks": ["Subtask 1", "Subtask 2"]
+                        },
+                        {
+                            "title": "Action Task 2 (Review & Follow-up) in ${targetLanguage}",
+                            "description": "Detailed task description in ${targetLanguage}",
+                            "assignee": "Assignee name or Unassigned",
+                            "priority": "High | Medium | Low",
+                            "category": "Follow-up | Technical | Research",
+                            "due_date": "YYYY-MM-DD or Next Week",
+                            "subtasks": ["Subtask 1", "Subtask 2"]
+                        },
+                        {
+                            "title": "Action Task 3 (Documentation & Testing) in ${targetLanguage}",
+                            "description": "Detailed task description in ${targetLanguage}",
+                            "assignee": "Assignee name or Unassigned",
+                            "priority": "High | Medium | Low",
+                            "category": "Documentation | Decision | Research",
+                            "due_date": "YYYY-MM-DD or Next Week",
+                            "subtasks": ["Subtask 1", "Subtask 2"]
                         }
                     ]
                 }

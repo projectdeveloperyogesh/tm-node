@@ -885,6 +885,116 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+
+        // Copy Handlers
+        const copySummaryBtn = document.getElementById('copySummaryBtn');
+        const copyInsightsTasksBtn = document.getElementById('copyInsightsTasksBtn');
+        const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+        const copyAllInsightsBtn = document.getElementById('copyAllInsightsBtn');
+
+        if (copySummaryBtn) {
+            copySummaryBtn.addEventListener('click', () => {
+                const meeting = state.meetings.find(m => m.id === state.currentMeetingId);
+                const text = meeting ? meeting.summary : (summaryContent ? summaryContent.innerText : '');
+                copyToClipboard(text, 'Executive Summary copied to clipboard!');
+            });
+        }
+
+        if (copyInsightsTasksBtn) {
+            copyInsightsTasksBtn.addEventListener('click', () => {
+                const meetingTasks = state.tasks.filter(t => t.meeting_id === state.currentMeetingId);
+                if (meetingTasks.length === 0) {
+                    alert('No action tasks available to copy.');
+                    return;
+                }
+                const formattedTasks = meetingTasks.map((t, idx) => {
+                    let taskStr = `${idx + 1}. [${t.priority || 'Medium'}] ${t.title}\n   Description: ${t.description || 'N/A'}\n   Assignee: ${t.assignee || 'Unassigned'} | Due: ${t.due_date || 'N/A'}`;
+                    if (t.subtasks && t.subtasks.length > 0) {
+                        taskStr += '\n   Subtasks:\n' + t.subtasks.map(st => `     - [${st.completed ? 'X' : ' '}] ${st.title}`).join('\n');
+                    }
+                    return taskStr;
+                }).join('\n\n');
+                copyToClipboard(formattedTasks, 'Extracted Action Tasks copied to clipboard!');
+            });
+        }
+
+        if (copyTranscriptBtn) {
+            copyTranscriptBtn.addEventListener('click', () => {
+                const meeting = state.meetings.find(m => m.id === state.currentMeetingId);
+                let text = '';
+                if (meeting && meeting.transcript) {
+                    text = meeting.transcript;
+                } else if (transcriptContainer) {
+                    text = transcriptContainer.innerText;
+                }
+                copyToClipboard(text, 'Full Meeting Transcript copied to clipboard!');
+            });
+        }
+
+        if (copyAllInsightsBtn) {
+            copyAllInsightsBtn.addEventListener('click', () => {
+                const meeting = state.meetings.find(m => m.id === state.currentMeetingId);
+                if (!meeting) {
+                    alert('Please select a meeting session first.');
+                    return;
+                }
+                const meetingTasks = state.tasks.filter(t => t.meeting_id === state.currentMeetingId);
+                let fullReport = `=========================================\nMEETING REPORT: ${meeting.title || 'Live Session'}\nDate: ${new Date(meeting.timestamp * 1000).toLocaleString()}\nLanguage: ${meeting.language || 'English'}\n=========================================\n\n--- EXECUTIVE SUMMARY ---\n${meeting.summary || 'N/A'}\n\n`;
+
+                fullReport += `--- ITEMS & TOPICS DISCUSSED ---\n`;
+                if (meeting.items_discussed && meeting.items_discussed.length > 0) {
+                    meeting.items_discussed.forEach(item => {
+                        fullReport += `• ${item.topic}: ${item.details}\n`;
+                    });
+                } else {
+                    fullReport += `No specific topics extracted.\n`;
+                }
+
+                fullReport += `\n--- EXTRACTED ACTION TASKS (${meetingTasks.length}) ---\n`;
+                if (meetingTasks.length > 0) {
+                    meetingTasks.forEach((t, idx) => {
+                        fullReport += `${idx + 1}. [${t.priority || 'Medium'}] ${t.title}\n   Description: ${t.description || 'N/A'}\n   Assignee: ${t.assignee || 'Unassigned'} | Due: ${t.due_date || 'N/A'}\n`;
+                    });
+                } else {
+                    fullReport += `No action tasks extracted.\n`;
+                }
+
+                fullReport += `\n--- FULL TRANSCRIPT ---\n${meeting.transcript || 'No transcript available.'}\n`;
+                copyToClipboard(fullReport, 'Full Session Intelligence copied to clipboard!');
+            });
+        }
+    }
+
+    function copyToClipboard(text, successMsg) {
+        if (!text || text.trim() === '') {
+            alert('Nothing to copy!');
+            return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert(`✅ ${successMsg || 'Copied to clipboard!'}`);
+            }).catch(() => {
+                fallbackCopyText(text, successMsg);
+            });
+        } else {
+            fallbackCopyText(text, successMsg);
+        }
+    }
+
+    function fallbackCopyText(text, successMsg) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            alert(`✅ ${successMsg || 'Copied to clipboard!'}`);
+        } catch (err) {
+            alert('Failed to copy text.');
+        }
+        document.body.removeChild(textarea);
     }
 
     function switchMeetingSession(meetingId) {
