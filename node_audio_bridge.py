@@ -3,16 +3,22 @@ import sys
 import json
 import uuid
 import datetime
-from fastapi import FastAPI, Form, HTTPException
-import uvicorn
 
 # Add current directory to sys.path to access audio_recorder & speech engines
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from audio_recorder import DualAudioRecorder
-from local_speech_engine import LocalSpeechEngine
-from meeting_analyzer import MeetingAnalyzer
+try:
+    from fastapi import FastAPI, Form, HTTPException
+    import uvicorn
+    from audio_recorder import DualAudioRecorder
+    from local_speech_engine import LocalSpeechEngine
+    from meeting_analyzer import MeetingAnalyzer
+except ImportError as imp_err:
+    print(f"\n[WASAPI Audio Bridge Warning] Missing Python dependency: {imp_err}")
+    print("[WASAPI Audio Bridge Notice] To enable Desktop WASAPI dual audio recording, run:")
+    print("  pip install -r python-requirements.txt\n")
+    sys.exit(0)
 
 app = FastAPI(title="Node WASAPI Audio Bridge")
 

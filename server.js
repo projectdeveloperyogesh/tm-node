@@ -40,9 +40,26 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Auto Start WASAPI Audio Bridge Helper for Windows Desktop Soundcard Recording
 let bridgeProcess = null;
+function findPythonExec() {
+    const candidates = [
+        path.join(BASE_DIR, '.venv', 'Scripts', 'python.exe'),
+        path.join(BASE_DIR, '.venv', 'bin', 'python'),
+        path.join(path.dirname(BASE_DIR), '.venv', 'Scripts', 'python.exe'),
+        path.join(path.dirname(BASE_DIR), '.venv', 'bin', 'python'),
+        'python',
+        'python3',
+        'py'
+    ];
+    for (const cand of candidates) {
+        if (cand.includes(path.sep) && fs.existsSync(cand)) {
+            return cand;
+        }
+    }
+    return process.platform === 'win32' ? 'python' : 'python3';
+}
+
 function startAudioBridge() {
-    const venvPython = path.join(path.dirname(BASE_DIR), '.venv', 'Scripts', 'python.exe');
-    const pythonExec = fs.existsSync(venvPython) ? venvPython : 'python';
+    const pythonExec = findPythonExec();
     const scriptPath = path.join(BASE_DIR, 'node_audio_bridge.py');
 
     console.log(`[Node.js Express Server] Launching WASAPI Dual Audio Bridge via: ${pythonExec}`);
