@@ -539,6 +539,17 @@ app.get('/api/ollama/status', (req, res) => {
     });
 });
 
+app.get('/api/ollama/progress', (req, res) => {
+    const { exec } = require('child_process');
+    exec('python -c "import ollama_installer, json; print(json.dumps(ollama_installer.get_ollama_progress()))"', (err, stdout) => {
+        try {
+            res.json(JSON.parse(stdout.trim()));
+        } catch (e) {
+            res.json({ status: "idle", percent: 0, message: "Checking status..." });
+        }
+    });
+});
+
 app.post('/api/ollama/setup', (req, res) => {
     const { exec } = require('child_process');
     const model = req.body.model_name || "llama3.2";

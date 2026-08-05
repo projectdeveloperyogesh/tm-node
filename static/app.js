@@ -1326,22 +1326,66 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSettingsModalBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
 
         const autoInstallOllamaBtn = document.getElementById('autoInstallOllamaBtn');
+        const ollamaProgressContainer = document.getElementById('ollamaProgressContainer');
+        const ollamaStatusBadge = document.getElementById('ollamaStatusBadge');
+        const ollamaPercentText = document.getElementById('ollamaPercentText');
+        const ollamaProgressFill = document.getElementById('ollamaProgressFill');
+        const ollamaStatusMsg = document.getElementById('ollamaStatusMsg');
+
+        let ollamaPollInterval = null;
+
         if (autoInstallOllamaBtn) {
             autoInstallOllamaBtn.addEventListener('click', async () => {
                 autoInstallOllamaBtn.disabled = true;
-                autoInstallOllamaBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Setting up Ollama...';
+                autoInstallOllamaBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Setting up...';
+                if (ollamaProgressContainer) ollamaProgressContainer.classList.remove('hidden');
+
                 try {
                     const formData = new FormData();
                     formData.append('model_name', 'llama3.2');
-                    const res = await fetch('/api/ollama/setup', { method: 'POST', body: formData });
-                    const data = await res.json();
-                    alert(`🦙 ${data.message || 'Ollama setup triggered successfully!'}`);
+                    await fetch('/api/ollama/setup', { method: 'POST', body: formData });
+
+                    if (ollamaPollInterval) clearInterval(ollamaPollInterval);
+                    ollamaPollInterval = setInterval(async () => {
+                        try {
+                            const pRes = await fetch('/api/ollama/progress');
+                            const pData = await pRes.json();
+
+                            const pct = pData.percent || 0;
+                            const st = pData.status || 'downloading';
+                            const msg = pData.message || 'Processing setup...';
+
+                            if (ollamaPercentText) ollamaPercentText.textContent = `${pct}%`;
+                            if (ollamaProgressFill) ollamaProgressFill.style.width = `${pct}%`;
+                            if (ollamaStatusMsg) ollamaStatusMsg.textContent = msg;
+
+                            if (ollamaStatusBadge) {
+                                if (st === 'ready') {
+                                    ollamaStatusBadge.textContent = '✅ Ready';
+                                    ollamaStatusBadge.className = 'badge badge-success';
+                                    clearInterval(ollamaPollInterval);
+                                    autoInstallOllamaBtn.disabled = false;
+                                    autoInstallOllamaBtn.innerHTML = '<i data-lucide="check"></i> Ollama Active';
+                                } else if (st === 'error') {
+                                    ollamaStatusBadge.textContent = '❌ Setup Error';
+                                    ollamaStatusBadge.className = 'badge badge-danger';
+                                    clearInterval(ollamaPollInterval);
+                                    autoInstallOllamaBtn.disabled = false;
+                                    autoInstallOllamaBtn.innerHTML = '<i data-lucide="download-cloud"></i> Retry Auto-Install';
+                                } else {
+                                    ollamaStatusBadge.textContent = st.toUpperCase();
+                                    ollamaStatusBadge.className = 'badge badge-primary';
+                                }
+                            }
+                            lucide.createIcons();
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }, 1000);
                 } catch (e) {
                     alert('Ollama auto-setup error: ' + e);
-                } finally {
                     autoInstallOllamaBtn.disabled = false;
                     autoInstallOllamaBtn.innerHTML = '<i data-lucide="download-cloud"></i> Auto-Install / Start Ollama';
-                    lucide.createIcons();
                 }
             });
         }
