@@ -400,6 +400,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.status === 'recording_started') {
                         state.isRecording = true;
                         state.isPaused = false;
+                        state.isMicMuted = false;
+                        state.isSpeakerMuted = false;
+
+                        if (muteMicBtn) {
+                            muteMicBtn.innerHTML = '<i data-lucide="mic"></i> Mic On';
+                            muteMicBtn.classList.remove('btn-danger');
+                            muteMicBtn.classList.add('btn-secondary');
+                        }
+                        if (muteSpeakerBtn) {
+                            muteSpeakerBtn.innerHTML = '<i data-lucide="volume-2"></i> Speaker On';
+                            muteSpeakerBtn.classList.remove('btn-danger');
+                            muteSpeakerBtn.classList.add('btn-secondary');
+                        }
+
                         startRecordBtn.disabled = true;
                         pauseRecordBtn.disabled = false;
                         stopRecordBtn.disabled = false;
@@ -407,6 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         recordingStatusPill.textContent = 'Recording';
 
                         startStatusPolling();
+                        lucide.createIcons();
                     } else {
                         alert('Failed to start recording: ' + (data.detail || 'Unknown error'));
                     }
