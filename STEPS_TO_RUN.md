@@ -67,4 +67,5 @@ Open your web browser and navigate to:
 - `pyaudiowpatch` - Windows WASAPI System Audio Loopback recorder
 - `SpeechRecognition` - Speech-to-Text audio converter
 - `fastapi` & `uvicorn` - Audio bridge helper
+- `python-multipart` - Form data parser for FastAPI bridge
 - `numpy` & `requests` - PCM audio buffer processing
