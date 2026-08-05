@@ -292,8 +292,7 @@ class MeetingAnalyzer {
     }
 
     _emptyAnalysis(meetingTitle, targetLanguage) {
-            tasks: []
-        };
+        return this._localNlpAnalysis("", meetingTitle, targetLanguage);
     }
 }
 
