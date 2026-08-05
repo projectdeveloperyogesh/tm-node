@@ -1,5 +1,5 @@
 /* ==========================================================================
-   TaskPulse AI (Node.js) - Single Page Application JavaScript Controller
+   TaskPulse AI - Single Page Application JavaScript Controller
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -98,7 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadMeetings();
         await loadTasks();
         await loadSettings();
-
         setupRecorderEvents();
         setupUploaderEvents();
         setupTaskBoardEvents();
@@ -160,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     speakerSelect.appendChild(opt);
                 });
             } else {
-                speakerSelect.innerHTML = '<option value="">Default System Audio</option>';
+                speakerSelect.innerHTML = '<option value="">Default System Audio (WASAPI Loopback)</option>';
             }
         } catch (e) {
             console.error('Error loading audio devices:', e);
@@ -404,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         startRecordBtn.disabled = true;
                         pauseRecordBtn.disabled = false;
                         stopRecordBtn.disabled = false;
-                        timerStatusLabel.textContent = 'Recording Live (Desktop Soundcard Mode)';
+                        timerStatusLabel.textContent = 'Recording Live';
                         recordingStatusPill.textContent = 'Recording';
 
                         startStatusPolling();
@@ -455,6 +454,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const muteMicBtn = document.getElementById('muteMicBtn');
+        const muteSpeakerBtn = document.getElementById('muteSpeakerBtn');
+
+        if (muteMicBtn) {
+            muteMicBtn.addEventListener('click', async () => {
+                state.isMicMuted = !state.isMicMuted;
+                if (state.isMicMuted) {
+                    muteMicBtn.innerHTML = '<i data-lucide="mic-off"></i> Mic Muted';
+                    muteMicBtn.classList.remove('btn-secondary');
+                    muteMicBtn.classList.add('btn-danger');
+                } else {
+                    muteMicBtn.innerHTML = '<i data-lucide="mic"></i> Mic On';
+                    muteMicBtn.classList.remove('btn-danger');
+                    muteMicBtn.classList.add('btn-secondary');
+                }
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('target', 'mic');
+                    await fetch('/api/record/mute', { method: 'POST', body: formData });
+                } catch (e) {
+                    console.error(e);
+                }
+                lucide.createIcons();
+            });
+        }
+
+        if (muteSpeakerBtn) {
+            muteSpeakerBtn.addEventListener('click', async () => {
+                state.isSpeakerMuted = !state.isSpeakerMuted;
+                if (state.isSpeakerMuted) {
+                    muteSpeakerBtn.innerHTML = '<i data-lucide="volume-x"></i> Speaker Muted';
+                    muteSpeakerBtn.classList.remove('btn-secondary');
+                    muteSpeakerBtn.classList.add('btn-danger');
+                } else {
+                    muteSpeakerBtn.innerHTML = '<i data-lucide="volume-2"></i> Speaker On';
+                    muteSpeakerBtn.classList.remove('btn-danger');
+                    muteSpeakerBtn.classList.add('btn-secondary');
+                }
+
+                try {
+                    const formData = new FormData();
+                    formData.append('target', 'speaker');
+                    await fetch('/api/record/mute', { method: 'POST', body: formData });
+                } catch (e) {
+                    console.error(e);
+                }
+                lucide.createIcons();
+            });
+        }
+
         stopRecordBtn.addEventListener('click', async () => {
             if (!state.isRecording) {
                 alert('No active recording session is currently running. Please click "Start Recording" first.');
@@ -472,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let data = null;
                 if (engine === 'web') {
                     if (!webWavEncoder) {
-                        alert('Live recording stream was not initialized. Please click "Start Recording" first.');
+                        alert('Browser live recording stream was not initialized. Please click "Start Recording" first.');
                         startRecordBtn.disabled = false;
                         stopRecordBtn.disabled = true;
                         timerStatusLabel.textContent = 'Standby';
@@ -513,14 +563,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     await loadTasks();
                     switchMeetingSession(data.meeting.id);
                     activateTab('insightsTab');
-                    alert(`✅ Meeting Saved Successfully!\n\nTitle: ${data.meeting.title}\nSaved Id: ${data.meeting.id}`);
-                } else {
-                    const errMsg = (data && (data.detail || data.message)) ? (data.detail || data.message) : 'Failed to save meeting session';
-                    alert('Error saving meeting: ' + errMsg);
+                } else if (data && data.detail) {
+                    alert('Error processing recording: ' + data.detail);
                     startRecordBtn.disabled = false;
                 }
             } catch (e) {
-                alert('Error processing and saving recording: ' + (e.message || e));
+                alert('Error processing recording: ' + (e.message || e));
                 startRecordBtn.disabled = false;
                 stopRecordBtn.disabled = false;
                 timerStatusLabel.textContent = 'Standby';
@@ -614,6 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = waveformCanvas.height;
 
         ctx.clearRect(0, 0, w, h);
+
         const barWidth = w / waveformPoints.length;
 
         for (let i = 0; i < waveformPoints.length; i++) {
@@ -743,13 +792,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opt = document.createElement('option');
                 opt.value = m.id;
                 opt.textContent = `${m.title} (${m.created_at})`;
-                if (m.id === state.currentMeetingId) {
-                    opt.selected = true;
-                }
                 meetingSessionSelect.appendChild(opt);
             });
 
-            if (!state.currentMeetingId || !state.meetings.some(m => m.id === state.currentMeetingId)) {
+            if (!state.currentMeetingId) {
                 state.currentMeetingId = state.meetings[0].id;
             }
             switchMeetingSession(state.currentMeetingId);
@@ -873,11 +919,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Action Items for selected meeting
-        let meetingTasks = state.tasks.filter(t => String(t.meeting_id) === String(meetingId));
-        if (meetingTasks.length === 0 && state.tasks.length > 0) {
-            meetingTasks = state.tasks;
-        }
-
+        const meetingTasks = state.tasks.filter(t => t.meeting_id === meetingId);
         const insightsTasksContainer = document.getElementById('insightsTasksContainer');
         const insightsTaskCount = document.getElementById('insightsTaskCount');
 
@@ -919,20 +961,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Transcript
         if (transcriptContainer) {
             transcriptContainer.innerHTML = '';
-            const transcriptText = meeting.transcript || (meeting.segments ? meeting.segments.map(s => s.text).join(' ') : '');
-            
-            if (transcriptText && transcriptText.trim().length > 0) {
-                const div = document.createElement('div');
-                div.className = 'transcript-segment';
-                div.innerHTML = `
-                    <div class="segment-meta margin-bottom-10" style="margin-bottom: 8px;">
-                        <span class="speaker-badge"><i data-lucide="mic" style="width: 14px; height: 14px; vertical-align: middle;"></i> Recorded Audio Transcript</span>
-                    </div>
-                    <div style="line-height: 1.8; color: #f3f4f6;">${escapeHtml(transcriptText).replace(/\n/g, '<br>')}</div>
-                `;
-                transcriptContainer.appendChild(div);
+            if (meeting.segments && meeting.segments.length > 0) {
+                meeting.segments.forEach(seg => {
+                    const div = document.createElement('div');
+                    div.className = 'transcript-segment';
+                    div.innerHTML = `
+                        <div class="segment-meta">
+                            <span class="speaker-badge">${escapeHtml(seg.speaker || 'Speaker')}</span> • ${seg.start} - ${seg.end}
+                        </div>
+                        <div>${escapeHtml(seg.text || '')}</div>
+                    `;
+                    transcriptContainer.appendChild(div);
+                });
+            } else if (meeting.transcript) {
+                transcriptContainer.innerHTML = `<div class="transcript-segment">${escapeHtml(meeting.transcript)}</div>`;
             } else {
-                transcriptContainer.innerHTML = '<p class="empty-state">No transcript data found for this session.</p>';
+                transcriptContainer.innerHTML = '<p class="empty-state">No transcript data.</p>';
             }
         }
 

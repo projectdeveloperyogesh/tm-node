@@ -201,6 +201,17 @@ app.post('/api/record/pause', async (req, res) => {
     }
 });
 
+// Toggle Mic / Speaker Mute Status
+app.post('/api/record/mute', async (req, res) => {
+    try {
+        const target = req.body.target || "mic";
+        const bridgeRes = await proxyToBridge('POST', '/mute', { target: target });
+        res.status(bridgeRes.statusCode).json(bridgeRes.body);
+    } catch (err) {
+        res.status(500).json({ detail: "Audio bridge error toggling mute." });
+    }
+});
+
 // Audio Gauges & Live Stream Status
 app.get('/api/record/status', async (req, res) => {
     try {

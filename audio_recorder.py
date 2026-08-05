@@ -69,6 +69,8 @@ class DualAudioRecorder:
 
         self.mic_level = 0.0
         self.speaker_level = 0.0
+        self.is_mic_muted = False
+        self.is_speaker_muted = False
 
         self.mic_live_chunks = []
         self.spk_live_chunks = []
@@ -253,13 +255,18 @@ class DualAudioRecorder:
                 try:
                     data = stream.read(chunk, exception_on_overflow=False)
                     if data:
-                        self.mic_frames.append((data, rate, channels))
-                        self.mic_live_chunks.append((data, rate, channels))
-                        
-                        # RMS decibel calculation
-                        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                        rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
-                        self.mic_level = float(np.clip(rms * 500.0, 0.0, 100.0))
+                        if self.is_mic_muted:
+                            silent_data = b'\x00' * len(data)
+                            self.mic_frames.append((silent_data, rate, channels))
+                            self.mic_level = 0.0
+                        else:
+                            self.mic_frames.append((data, rate, channels))
+                            self.mic_live_chunks.append((data, rate, channels))
+                            
+                            # RMS decibel calculation
+                            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+                            rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
+                            self.mic_level = float(np.clip(rms * 500.0, 0.0, 100.0))
                 except Exception:
                     pass
 
@@ -299,13 +306,18 @@ class DualAudioRecorder:
                 try:
                     data = stream.read(chunk, exception_on_overflow=False)
                     if data:
-                        self.speaker_frames.append((data, rate, channels))
-                        self.spk_live_chunks.append((data, rate, channels))
+                        if self.is_speaker_muted:
+                            silent_data = b'\x00' * len(data)
+                            self.speaker_frames.append((silent_data, rate, channels))
+                            self.speaker_level = 0.0
+                        else:
+                            self.speaker_frames.append((data, rate, channels))
+                            self.spk_live_chunks.append((data, rate, channels))
 
-                        # RMS decibel calculation
-                        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                        rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
-                        self.speaker_level = float(np.clip(rms * 500.0, 0.0, 100.0))
+                            # RMS decibel calculation
+                            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+                            rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
+                            self.speaker_level = float(np.clip(rms * 500.0, 0.0, 100.0))
                 except Exception:
                     pass
 
@@ -472,6 +484,15 @@ class DualAudioRecorder:
             "live_transcript": list(self.live_transcript)
         }
 
+    def toggle_mute(self, target, state=None):
+        if target == "mic":
+            self.is_mic_muted = not self.is_mic_muted if state is None else bool(state)
+            return {"status": "success", "target": "mic", "is_muted": self.is_mic_muted}
+        elif target == "speaker":
+            self.is_speaker_muted = not self.is_speaker_muted if state is None else bool(state)
+            return {"status": "success", "target": "speaker", "is_muted": self.is_speaker_muted}
+        return {"status": "error", "message": "Invalid mute target"}
+
     def get_status(self):
         elapsed = 0
         if self.is_recording and self.start_time:
@@ -483,9 +504,11 @@ class DualAudioRecorder:
         return {
             "is_recording": self.is_recording,
             "is_paused": self.is_paused,
+            "is_mic_muted": self.is_mic_muted,
+            "is_speaker_muted": self.is_speaker_muted,
             "elapsed_seconds": max(0, int(elapsed)),
-            "mic_level": self.mic_level if self.is_recording and not self.is_paused else 0.0,
-            "speaker_level": self.speaker_level if self.is_recording and not self.is_paused else 0.0,
+            "mic_level": self.mic_level if self.is_recording and not self.is_paused and not self.is_mic_muted else 0.0,
+            "speaker_level": self.speaker_level if self.is_recording and not self.is_paused and not self.is_speaker_muted else 0.0,
             "live_transcript": self.live_transcript,
             "current_filename": os.path.basename(self.current_filename) if self.current_filename else None
         }

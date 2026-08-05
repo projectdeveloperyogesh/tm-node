@@ -42,6 +42,10 @@ def start_recording(mic_id: str = Form(None), speaker_id: str = Form(None)):
 def pause_recording():
     return recorder.pause_recording()
 
+@app.post("/mute")
+def toggle_mute(target: str = Form(...)):
+    return recorder.toggle_mute(target=target)
+
 @app.get("/status")
 def get_status():
     return recorder.get_status()
