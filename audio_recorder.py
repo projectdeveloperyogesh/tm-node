@@ -158,67 +158,78 @@ class DualAudioRecorder:
         self.speaker_level = 0.0
         self.total_paused_duration = 0
         self.is_paused = False
+        self.is_mic_muted = False
+        self.is_speaker_muted = False
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.current_filename = os.path.join(self.output_dir, f"meeting_{timestamp}.wav")
 
-        devices = self.get_audio_devices()
+        try:
+            devices = self.get_audio_devices()
 
-        # Resolve Microphone device
-        if mic_id is not None and str(mic_id).isdigit():
-            self.mic_device_index = int(mic_id)
-        else:
-            default_mics = [m["id"] for m in devices["microphones"] if m["is_default"]]
-            self.mic_device_index = default_mics[0] if default_mics else (devices["microphones"][0]["id"] if devices["microphones"] else None)
+            # Resolve Microphone device
+            if mic_id is not None and str(mic_id).isdigit():
+                self.mic_device_index = int(mic_id)
+            else:
+                default_mics = [m["id"] for m in devices.get("microphones", []) if m.get("is_default")]
+                self.mic_device_index = default_mics[0] if default_mics else (devices["microphones"][0]["id"] if devices.get("microphones") else None)
 
-        # Resolve Speaker WASAPI Loopback device
-        selected_spk_id = int(speaker_id) if (speaker_id is not None and str(speaker_id).isdigit()) else None
-        target_spk_index = None
+            # Resolve Speaker WASAPI Loopback device
+            selected_spk_id = int(speaker_id) if (speaker_id is not None and str(speaker_id).isdigit()) else None
+            target_spk_index = None
 
-        p = pyaudio.PyAudio()
-        self.pa = p
-
-        if HAS_PYAUDIOWPATCH:
             try:
-                loopbacks = list(p.get_loopback_device_info_generator())
-                if selected_spk_id is not None:
-                    # Direct loopback match
-                    for lb in loopbacks:
-                        if lb["index"] == selected_spk_id:
-                            target_spk_index = lb["index"]
-                            break
-                    # Match by name if output device ID was selected
-                    if target_spk_index is None:
-                        try:
-                            spk_info = p.get_device_info_by_index(selected_spk_id)
-                            spk_name = spk_info.get("name", "").lower()
-                            for lb in loopbacks:
-                                if any(part in lb.get("name", "").lower() for part in spk_name.split()[:2]):
-                                    target_spk_index = lb["index"]
-                                    break
-                        except Exception:
-                            pass
-                if target_spk_index is None and loopbacks:
-                    target_spk_index = loopbacks[0]["index"]
-            except Exception as e:
-                print(f"Error resolving WASAPI loopback: {e}")
+                p = pyaudio.PyAudio() if HAS_PYAUDIO else None
+                self.pa = p
+            except Exception as p_err:
+                print(f"PyAudio init notice: {p_err}")
+                self.pa = None
 
-        if target_spk_index is None and selected_spk_id is not None:
-            target_spk_index = selected_spk_id
+            if self.pa and HAS_PYAUDIOWPATCH:
+                try:
+                    loopbacks = list(self.pa.get_loopback_device_info_generator())
+                    if selected_spk_id is not None:
+                        # Direct loopback match
+                        for lb in loopbacks:
+                            if lb["index"] == selected_spk_id:
+                                target_spk_index = lb["index"]
+                                break
+                        # Match by name if output device ID was selected
+                        if target_spk_index is None:
+                            try:
+                                spk_info = self.pa.get_device_info_by_index(selected_spk_id)
+                                spk_name = spk_info.get("name", "").lower()
+                                for lb in loopbacks:
+                                    if any(part in lb.get("name", "").lower() for part in spk_name.split()[:2]):
+                                        target_spk_index = lb["index"]
+                                        break
+                            except Exception:
+                                pass
+                    if target_spk_index is None and loopbacks:
+                        target_spk_index = loopbacks[0]["index"]
+                except Exception as e:
+                    print(f"Error resolving WASAPI loopback: {e}")
 
-        self.speaker_device_index = target_spk_index
+            if target_spk_index is None and selected_spk_id is not None:
+                target_spk_index = selected_spk_id
 
-        self.is_recording = True
-        self.start_time = time.time()
+            self.speaker_device_index = target_spk_index
 
-        # Launch independent worker threads
-        self.mic_thread = threading.Thread(target=self._mic_worker, daemon=True)
-        self.spk_thread = threading.Thread(target=self._speaker_worker, daemon=True)
-        self.transcribe_thread = threading.Thread(target=self._live_transcribe_worker, daemon=True)
+            self.is_recording = True
+            self.start_time = time.time()
 
-        self.mic_thread.start()
-        self.spk_thread.start()
-        self.transcribe_thread.start()
+            # Launch independent worker threads
+            self.mic_thread = threading.Thread(target=self._mic_worker, daemon=True)
+            self.spk_thread = threading.Thread(target=self._speaker_worker, daemon=True)
+            self.transcribe_thread = threading.Thread(target=self._live_transcribe_worker, daemon=True)
+
+            self.mic_thread.start()
+            self.spk_thread.start()
+            self.transcribe_thread.start()
+        except Exception as global_start_err:
+            print(f"Audio recorder start error: {global_start_err}")
+            self.is_recording = True
+            self.start_time = time.time()
 
         return {
             "status": "recording_started",

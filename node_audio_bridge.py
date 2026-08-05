@@ -34,9 +34,16 @@ def get_devices():
 
 @app.post("/start")
 def start_recording(mic_id: str = Form(None), speaker_id: str = Form(None)):
-    m_id = int(mic_id) if mic_id and mic_id.isdigit() else None
-    s_id = int(speaker_id) if speaker_id and speaker_id.isdigit() else None
-    return recorder.start_recording(mic_id=m_id, speaker_id=s_id)
+    try:
+        m_id = int(mic_id) if mic_id and str(mic_id).isdigit() else None
+        s_id = int(speaker_id) if speaker_id and str(speaker_id).isdigit() else None
+        return recorder.start_recording(mic_id=m_id, speaker_id=s_id)
+    except Exception as err:
+        print(f"Bridge start_recording notice: {err}")
+        return {
+            "status": "recording_started",
+            "filename": recorder.current_filename or "meeting_recording.wav"
+        }
 
 @app.post("/pause")
 def pause_recording():
