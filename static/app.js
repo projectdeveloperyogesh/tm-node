@@ -94,10 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function init() {
         setupTabNavigation();
-        await loadAudioDevices();
-        await loadMeetings();
-        await loadTasks();
-        await loadSettings();
+        try { await loadAudioDevices(); } catch(e) { console.warn('loadAudioDevices notice:', e); }
+        try { await loadMeetings(); } catch(e) { console.warn('loadMeetings notice:', e); }
+        try { await loadTasks(); } catch(e) { console.warn('loadTasks notice:', e); }
+        try { await loadSettings(); } catch(e) { console.warn('loadSettings notice:', e); }
         setupRecorderEvents();
         setupUploaderEvents();
         setupTaskBoardEvents();
