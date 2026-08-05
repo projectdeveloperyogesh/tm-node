@@ -12,9 +12,15 @@ import speech_recognition as sr
 try:
     import pyaudiowpatch as pyaudio
     HAS_PYAUDIOWPATCH = True
-except ImportError:
-    import pyaudio
-    HAS_PYAUDIOWPATCH = False
+    HAS_PYAUDIO = True
+except Exception:
+    try:
+        import pyaudio
+        HAS_PYAUDIOWPATCH = False
+        HAS_PYAUDIO = True
+    except Exception:
+        HAS_PYAUDIOWPATCH = False
+        HAS_PYAUDIO = False
 
 
 def resample_pcm(pcm_bytes, orig_rate, target_rate=16000, channels=1):
@@ -242,103 +248,166 @@ class DualAudioRecorder:
         }
 
     def _mic_worker(self):
-        """Dedicated thread for Microphone audio capture."""
+        """Dedicated thread for Microphone audio capture with multi-sample rate & channel fallback."""
         if self.mic_device_index is None or self.pa is None:
             return
 
+        stream = None
+        rate = 44100
+        channels = 1
+        chunk = 1024
+
         try:
             info = self.pa.get_device_info_by_index(self.mic_device_index)
-            channels = min(2, info["maxInputChannels"]) if info["maxInputChannels"] > 0 else 1
-            rate = int(info["defaultSampleRate"]) if info.get("defaultSampleRate") else 44100
-            chunk = 1024
+            dev_rate = int(info.get("defaultSampleRate", 44100))
+            dev_ch = info.get("maxInputChannels", 1)
+        except Exception:
+            dev_rate = 44100
+            dev_ch = 1
 
-            stream = self.pa.open(
-                format=pyaudio.paInt16,
-                channels=channels,
-                rate=rate,
-                input=True,
-                input_device_index=self.mic_device_index,
-                frames_per_buffer=chunk
-            )
+        rate_candidates = [dev_rate, 48000, 44100, 16000]
+        channel_candidates = [min(2, dev_ch) if dev_ch > 0 else 1, 1, 2]
 
-            while self.is_recording:
-                if self.is_paused:
-                    time.sleep(0.1)
-                    continue
-
+        for r in rate_candidates:
+            for c in channel_candidates:
                 try:
-                    data = stream.read(chunk, exception_on_overflow=False)
-                    if data:
-                        if self.is_mic_muted:
-                            silent_data = b'\x00' * len(data)
-                            self.mic_frames.append((silent_data, rate, channels))
-                            self.mic_level = 0.0
-                        else:
-                            self.mic_frames.append((data, rate, channels))
-                            self.mic_live_chunks.append((data, rate, channels))
-                            
-                            # RMS decibel calculation
-                            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                            rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
-                            self.mic_level = float(np.clip(rms * 500.0, 0.0, 100.0))
+                    stream = self.pa.open(
+                        format=pyaudio.paInt16,
+                        channels=c,
+                        rate=r,
+                        input=True,
+                        input_device_index=self.mic_device_index,
+                        frames_per_buffer=chunk
+                    )
+                    rate = r
+                    channels = c
+                    break
                 except Exception:
-                    pass
+                    stream = None
+            if stream is not None:
+                break
 
+        if stream is None:
+            print(f"Mic worker notice: Could not open stream for mic device {self.mic_device_index}")
+            return
+
+        print(f"Mic stream active on device {self.mic_device_index} (rate={rate}, ch={channels})")
+
+        while self.is_recording:
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
+
+            try:
+                data = stream.read(chunk, exception_on_overflow=False)
+                if data:
+                    if self.is_mic_muted:
+                        silent_data = b'\x00' * len(data)
+                        self.mic_frames.append((silent_data, rate, channels))
+                        self.mic_level = 0.0
+                    else:
+                        self.mic_frames.append((data, rate, channels))
+                        self.mic_live_chunks.append((data, rate, channels))
+                        
+                        # RMS + Peak decibel calculation with logarithmic/linear scaling
+                        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+                        if len(samples) > 0:
+                            rms = np.sqrt(np.mean(samples**2))
+                            peak = np.max(np.abs(samples))
+                            val = max(rms * 1500.0, peak * 800.0)
+                            self.mic_level = float(np.clip(val, 0.0, 100.0))
+                        else:
+                            self.mic_level = 0.0
+            except Exception:
+                pass
+
+        try:
             stream.stop_stream()
             stream.close()
-        except Exception as e:
-            print(f"Mic worker exception: {e}")
+        except Exception:
+            pass
 
     def _speaker_worker(self):
-        """Dedicated thread for WASAPI Loopback Speaker audio capture."""
+        """Dedicated thread for WASAPI Loopback Speaker audio capture with multi-sample rate fallback."""
         if self.speaker_device_index is None or self.pa is None:
             print("Speaker worker: No speaker device index set")
             return
 
+        stream = None
+        rate = 48000
+        channels = 2
+        chunk = 1024
+
         try:
             info = self.pa.get_device_info_by_index(self.speaker_device_index)
-            channels = info["maxInputChannels"] if info["maxInputChannels"] > 0 else 2
-            rate = int(info["defaultSampleRate"]) if info.get("defaultSampleRate") else 48000
-            chunk = 1024
+            dev_rate = int(info.get("defaultSampleRate", 48000))
+            dev_ch = info.get("maxInputChannels", 2)
+        except Exception:
+            dev_rate = 48000
+            dev_ch = 2
 
-            stream = self.pa.open(
-                format=pyaudio.paInt16,
-                channels=channels,
-                rate=rate,
-                input=True,
-                input_device_index=self.speaker_device_index,
-                frames_per_buffer=chunk
-            )
+        rate_candidates = [dev_rate, 48000, 44100, 96000]
+        channel_candidates = [dev_ch if dev_ch > 0 else 2, 2, 1]
 
-            print(f"Speaker WASAPI loopback stream active on device {self.speaker_device_index} (rate={rate}, ch={channels})")
-
-            while self.is_recording:
-                if self.is_paused:
-                    time.sleep(0.1)
-                    continue
-
+        for r in rate_candidates:
+            for c in channel_candidates:
                 try:
-                    data = stream.read(chunk, exception_on_overflow=False)
-                    if data:
-                        if self.is_speaker_muted:
-                            silent_data = b'\x00' * len(data)
-                            self.speaker_frames.append((silent_data, rate, channels))
-                            self.speaker_level = 0.0
-                        else:
-                            self.speaker_frames.append((data, rate, channels))
-                            self.spk_live_chunks.append((data, rate, channels))
-
-                            # RMS decibel calculation
-                            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                            rms = np.sqrt(np.mean(samples**2)) if len(samples) > 0 else 0
-                            self.speaker_level = float(np.clip(rms * 500.0, 0.0, 100.0))
+                    stream = self.pa.open(
+                        format=pyaudio.paInt16,
+                        channels=c,
+                        rate=r,
+                        input=True,
+                        input_device_index=self.speaker_device_index,
+                        frames_per_buffer=chunk
+                    )
+                    rate = r
+                    channels = c
+                    break
                 except Exception:
-                    pass
+                    stream = None
+            if stream is not None:
+                break
 
+        if stream is None:
+            print(f"Speaker worker notice: Could not open stream for speaker device {self.speaker_device_index}")
+            return
+
+        print(f"Speaker WASAPI loopback stream active on device {self.speaker_device_index} (rate={rate}, ch={channels})")
+
+        while self.is_recording:
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
+
+            try:
+                data = stream.read(chunk, exception_on_overflow=False)
+                if data:
+                    if self.is_speaker_muted:
+                        silent_data = b'\x00' * len(data)
+                        self.speaker_frames.append((silent_data, rate, channels))
+                        self.spk_live_chunks.append((data, rate, channels))
+                        self.speaker_level = 0.0
+                    else:
+                        self.speaker_frames.append((data, rate, channels))
+                        self.spk_live_chunks.append((data, rate, channels))
+
+                        # RMS + Peak decibel calculation with logarithmic/linear scaling
+                        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+                        if len(samples) > 0:
+                            rms = np.sqrt(np.mean(samples**2))
+                            peak = np.max(np.abs(samples))
+                            val = max(rms * 1500.0, peak * 800.0)
+                            self.speaker_level = float(np.clip(val, 0.0, 100.0))
+                        else:
+                            self.speaker_level = 0.0
+            except Exception:
+                pass
+
+        try:
             stream.stop_stream()
             stream.close()
-        except Exception as e:
-            print(f"Speaker worker exception: {e}")
+        except Exception:
+            pass
 
     def _live_transcribe_worker(self):
         """Non-blocking live speech recognition thread using async ThreadPoolExecutor."""
