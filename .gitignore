@@ -12,3 +12,9 @@ data/*
 !data/.gitkeep
 .env
 .DS_Store
+
+scratch/
+*.exe
+recordings/
+processed/
+uploads/
