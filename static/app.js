@@ -358,6 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupRecorderEvents() {
         const engineSelect = document.getElementById('recordingEngineSelect');
         const deviceSelectorsContainer = document.querySelector('.device-selectors');
+        const muteMicBtn = document.getElementById('muteMicBtn');
+        const muteSpeakerBtn = document.getElementById('muteSpeakerBtn');
 
         if (engineSelect && deviceSelectorsContainer) {
             const toggleDeviceSelectors = () => {
@@ -468,9 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(e);
             }
         });
-
-        const muteMicBtn = document.getElementById('muteMicBtn');
-        const muteSpeakerBtn = document.getElementById('muteSpeakerBtn');
 
         if (muteMicBtn) {
             muteMicBtn.addEventListener('click', async () => {
