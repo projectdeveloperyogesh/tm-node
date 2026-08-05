@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const data = await res.json();
 
-                    if (data.status === 'recording_started') {
+                    if (data.status === 'recording_started' || data.status === 'already_recording') {
                         state.isRecording = true;
                         state.isPaused = false;
                         state.isMicMuted = false;
@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         startStatusPolling();
                         lucide.createIcons();
                     } else {
-                        alert('Failed to start recording: ' + (data.detail || 'Unknown error'));
+                        alert('Failed to start recording: ' + (data.detail || data.message || data.status || 'Unknown error'));
                     }
                 } catch (e) {
                     alert('Failed to start recording: ' + e);

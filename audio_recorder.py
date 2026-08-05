@@ -145,7 +145,10 @@ class DualAudioRecorder:
 
     def start_recording(self, mic_id=None, speaker_id=None):
         if self.is_recording:
-            return {"status": "already_recording", "filename": self.current_filename}
+            try:
+                self.stop_recording()
+            except Exception:
+                pass
 
         self.mic_frames = []
         self.speaker_frames = []
