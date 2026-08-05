@@ -2,18 +2,26 @@
 
 TaskPulse AI is a full-stack Node.js & Express application for meeting session recording, speech-to-text transcription, executive meeting summary generation, and Kanban action task extraction powered by `@google/generative-ai` and WASAPI Dual Audio capture.
 
-## Features
-- **Express REST Server**: Clean endpoints for meetings, task board, media upload, and settings.
-- **Dual Audio Capture**: Record Microphone and System Audio loopback.
-- **Multi-language Support**: English, Hindi, Hinglish, Spanish, French, and German.
-- **Kanban Task Board**: Manage extracted action items seamlessly.
+## 📦 How to Install Packages & Run
 
-## Running Locally
+### 1. Clone Repository & Install Node Packages
 ```bash
-# 1. Install dependencies
-npm install
+git clone https://github.com/projectdeveloperyogesh/tm-node.git
+cd tm-node
 
-# 2. Run Express server
+npm install
+```
+
+### 2. Install Python Audio Helper Packages
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r python-requirements.txt
+```
+
+### 3. Start Server
+```bash
 npm start
 ```
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) in your browser.
+See [STEPS_TO_RUN.md](STEPS_TO_RUN.md) for full guide.
