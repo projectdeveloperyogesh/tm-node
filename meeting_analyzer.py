@@ -1,114 +1,219 @@
-import re
-import sys
-import json
-import uuid
-import datetime
+import requests
 
 class MeetingAnalyzer:
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, groq_api_key=None, openai_api_key=None, ollama_host=None, default_provider="auto"):
         self.api_key = api_key
+        self.groq_api_key = groq_api_key
+        self.openai_api_key = openai_api_key
+        self.ollama_host = ollama_host or "http://localhost:11434"
+        self.default_provider = default_provider
 
-    def analyze_meeting(self, transcript_text, meeting_title="Meeting Recording", target_language="English"):
+    def analyze_meeting(self, transcript_text, meeting_title="Meeting Recording", target_language="English", provider=None):
         """
         Analyzes meeting transcript text and generates:
         1. Executive Summary
         2. List of Items & Topics Discussed
         3. Extracted Action Tasks
-        In the requested target language (English, Hindi, Hinglish, Spanish, French, German, etc.).
+        Supports multi-provider AI routing: Gemini, Groq (Llama 3.3), OpenAI (GPT-4o), Ollama (Local AI), Local NLP.
         """
         if not transcript_text or len(transcript_text.strip()) == 0:
             transcript_text = f"Audio recorded for meeting session '{meeting_title}'."
 
-        # If Gemini API key is present, attempt LLM analysis
+        selected_provider = (provider or self.default_provider or "auto").lower()
+
+        # Direct Provider Routing
+        if selected_provider == "groq" and self.groq_api_key:
+            res = self._analyze_groq(transcript_text, meeting_title, target_language)
+            if res: return res
+
+        if selected_provider == "openai" and self.openai_api_key:
+            res = self._analyze_openai(transcript_text, meeting_title, target_language)
+            if res: return res
+
+        if selected_provider == "ollama":
+            res = self._analyze_ollama(transcript_text, meeting_title, target_language)
+            if res: return res
+
+        if selected_provider == "gemini" and self.api_key:
+            res = self._analyze_gemini(transcript_text, meeting_title, target_language)
+            if res: return res
+
+        if selected_provider == "local":
+            return self._local_nlp_analysis(transcript_text, meeting_title, target_language=target_language)
+
+        # Auto Provider Resolution Strategy: Gemini -> Groq -> OpenAI -> Ollama -> Local NLP
         if self.api_key:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                
-                models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-                response_text = None
+            res = self._analyze_gemini(transcript_text, meeting_title, target_language)
+            if res: return res
 
-                prompt = f"""
-                Analyze the following meeting transcript and extract structured meeting intelligence.
-                
-                CRITICAL LANGUAGE INSTRUCTION:
-                You MUST write ALL summary paragraphs, items discussed, topic titles, details, task titles, descriptions, and subtasks in {target_language}.
-                - If target_language is 'Hindi', write in natural Hindi using Devanagari script.
-                - If target_language is 'Hinglish', write in natural Hinglish (Roman script Hindi mixed with English).
-                - If target_language is 'English', write in clear, professional English.
-                - Otherwise, translate and write in {target_language}.
+        if self.groq_api_key:
+            res = self._analyze_groq(transcript_text, meeting_title, target_language)
+            if res: return res
 
-                TASK EXTRACTION INSTRUCTION:
-                You MUST extract AT LEAST 3 to 6 comprehensive, actionable tasks from the meeting transcript covering different aspects (Technical Implementation, Follow-up Review, Documentation, Testing/QA, Timeline Updates). Do NOT return only 1 task.
+        if self.openai_api_key:
+            res = self._analyze_openai(transcript_text, meeting_title, target_language)
+            if res: return res
 
-                Return ONLY a JSON object with this exact schema:
-                {{
-                    "summary": "Executive summary paragraph written in {target_language}...",
-                    "items_discussed": [
-                        {{
-                            "topic": "Topic Title in {target_language}",
-                            "details": "Details discussed, points brought up, and key decisions in {target_language}.",
-                            "category": "Decision | Discussion | Agenda Item | Update"
-                        }}
-                    ],
-                    "tasks": [
-                        {{
-                            "title": "Action Task 1 (Primary Objective) in {target_language}",
-                            "description": "Detailed task description in {target_language}",
-                            "assignee": "Assignee name or Unassigned",
-                            "priority": "High | Medium | Low",
-                            "category": "Technical | Follow-up | Decision | Research | Documentation",
-                            "due_date": "YYYY-MM-DD or Next Week",
-                            "subtasks": ["Subtask 1", "Subtask 2"]
-                        }},
-                        {{
-                            "title": "Action Task 2 (Review & Follow-up) in {target_language}",
-                            "description": "Detailed task description in {target_language}",
-                            "assignee": "Assignee name or Unassigned",
-                            "priority": "High | Medium | Low",
-                            "category": "Follow-up | Technical | Research",
-                            "due_date": "YYYY-MM-DD or Next Week",
-                            "subtasks": ["Subtask 1", "Subtask 2"]
-                        }},
-                        {{
-                            "title": "Action Task 3 (Documentation & Testing) in {target_language}",
-                            "description": "Detailed task description in {target_language}",
-                            "assignee": "Assignee name or Unassigned",
-                            "priority": "High | Medium | Low",
-                            "category": "Documentation | Decision | Research",
-                            "due_date": "YYYY-MM-DD or Next Week",
-                            "subtasks": ["Subtask 1", "Subtask 2"]
-                        }}
-                    ]
-                }}
+        res_ollama = self._analyze_ollama(transcript_text, meeting_title, target_language)
+        if res_ollama: return res_ollama
 
-                Transcript:
-                {transcript_text}
-                """
-
-                for m_name in models_to_try:
-                    try:
-                        model = genai.GenerativeModel(m_name)
-                        response = model.generate_content(prompt)
-                        if response and response.text:
-                            response_text = response.text.strip()
-                            break
-                    except Exception as m_err:
-                        print(f"Model {m_name} notice: {m_err}")
-
-                if response_text:
-                    # Extract JSON object using regex
-                    json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                    if json_match:
-                        response_text = json_match.group(0)
-
-                    parsed = json.loads(response_text)
-                    return self._enrich_analysis_output(parsed, meeting_title, target_language)
-            except Exception as e:
-                print(f"Gemini API analysis notice, falling back to local NLP engine: {e}")
-
-        # Local Smart NLP Heuristic Engine
+        # Fallback to 100% Offline NLP Engine
         return self._local_nlp_analysis(transcript_text, meeting_title, target_language=target_language)
+
+    def _get_analysis_prompt(self, transcript_text, target_language):
+        return f"""
+        Analyze the following meeting transcript and extract structured meeting intelligence.
+        
+        CRITICAL LANGUAGE INSTRUCTION:
+        You MUST write ALL summary paragraphs, items discussed, topic titles, details, task titles, descriptions, and subtasks in {target_language}.
+        - If target_language is 'Hindi', write in natural Hindi using Devanagari script.
+        - If target_language is 'Hinglish', write in natural Hinglish (Roman script Hindi mixed with English).
+        - If target_language is 'English', write in clear, professional English.
+        - Otherwise, translate and write in {target_language}.
+
+        TASK EXTRACTION INSTRUCTION:
+        You MUST extract AT LEAST 3 to 6 comprehensive, actionable tasks from the meeting transcript covering different aspects (Technical Implementation, Follow-up Review, Documentation, Testing/QA, Timeline Updates). Do NOT return only 1 task.
+
+        Return ONLY a JSON object with this exact schema:
+        {{
+            "summary": "Executive summary paragraph written in {target_language}...",
+            "items_discussed": [
+                {{
+                    "topic": "Topic Title in {target_language}",
+                    "details": "Details discussed, points brought up, and key decisions in {target_language}.",
+                    "category": "Decision | Discussion | Agenda Item | Update"
+                }}
+            ],
+            "tasks": [
+                {{
+                    "title": "Action Task 1 (Primary Objective) in {target_language}",
+                    "description": "Detailed task description in {target_language}",
+                    "assignee": "Assignee name or Unassigned",
+                    "priority": "High | Medium | Low",
+                    "category": "Technical | Follow-up | Decision | Research | Documentation",
+                    "due_date": "YYYY-MM-DD or Next Week",
+                    "subtasks": ["Subtask 1", "Subtask 2"]
+                }},
+                {{
+                    "title": "Action Task 2 (Review & Follow-up) in {target_language}",
+                    "description": "Detailed task description in {target_language}",
+                    "assignee": "Assignee name or Unassigned",
+                    "priority": "High | Medium | Low",
+                    "category": "Follow-up | Technical | Research",
+                    "due_date": "YYYY-MM-DD or Next Week",
+                    "subtasks": ["Subtask 1", "Subtask 2"]
+                }},
+                {{
+                    "title": "Action Task 3 (Documentation & Testing) in {target_language}",
+                    "description": "Detailed task description in {target_language}",
+                    "assignee": "Assignee name or Unassigned",
+                    "priority": "High | Medium | Low",
+                    "category": "Documentation | Decision | Research",
+                    "due_date": "YYYY-MM-DD or Next Week",
+                    "subtasks": ["Subtask 1", "Subtask 2"]
+                }}
+            ]
+        }}
+
+        Transcript:
+        {transcript_text}
+        """
+
+    def _analyze_gemini(self, transcript_text, meeting_title, target_language):
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+            prompt = self._get_analysis_prompt(transcript_text, target_language)
+
+            for m_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(m_name)
+                    response = model.generate_content(prompt)
+                    if response and response.text:
+                        r_text = response.text.strip()
+                        m = re.search(r'\{.*\}', r_text, re.DOTALL)
+                        if m: r_text = m.group(0)
+                        parsed = json.loads(r_text)
+                        return self._enrich_analysis_output(parsed, meeting_title, target_language)
+                except Exception as m_err:
+                    print(f"Gemini {m_name} notice: {m_err}")
+        except Exception as e:
+            print(f"Gemini API notice: {e}")
+        return None
+
+    def _analyze_groq(self, transcript_text, meeting_title, target_language):
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            prompt = self._get_analysis_prompt(transcript_text, target_language)
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": "You are an expert AI meeting analyst. Return strictly JSON."},
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=60)
+            if res.status_code == 200:
+                content = res.json()["choices"][0]["message"]["content"]
+                m = re.search(r'\{.*\}', content, re.DOTALL)
+                if m: content = m.group(0)
+                parsed = json.loads(content)
+                return self._enrich_analysis_output(parsed, meeting_title, target_language)
+        except Exception as e:
+            print(f"Groq API notice: {e}")
+        return None
+
+    def _analyze_openai(self, transcript_text, meeting_title, target_language):
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.openai_api_key}",
+                "Content-Type": "application/json"
+            }
+            prompt = self._get_analysis_prompt(transcript_text, target_language)
+            payload = {
+                "model": "gpt-4o-mini",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": "You are an expert AI meeting analyst. Return strictly JSON."},
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            res = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=60)
+            if res.status_code == 200:
+                content = res.json()["choices"][0]["message"]["content"]
+                m = re.search(r'\{.*\}', content, re.DOTALL)
+                if m: content = m.group(0)
+                parsed = json.loads(content)
+                return self._enrich_analysis_output(parsed, meeting_title, target_language)
+        except Exception as e:
+            print(f"OpenAI API notice: {e}")
+        return None
+
+    def _analyze_ollama(self, transcript_text, meeting_title, target_language):
+        try:
+            host = self.ollama_host or "http://localhost:11434"
+            prompt = self._get_analysis_prompt(transcript_text, target_language)
+            payload = {
+                "model": "llama3.2",
+                "format": "json",
+                "stream": False,
+                "prompt": prompt
+            }
+            res = requests.post(f"{host}/api/generate", json=payload, timeout=60)
+            if res.status_code == 200:
+                content = res.json().get("response", "")
+                m = re.search(r'\{.*\}', content, re.DOTALL)
+                if m: content = m.group(0)
+                parsed = json.loads(content)
+                return self._enrich_analysis_output(parsed, meeting_title, target_language)
+        except Exception as e:
+            print(f"Ollama local notice: {e}")
+        return None
 
     def _local_nlp_analysis(self, transcript_text, meeting_title, target_language="English"):
         """100% Offline NLP Heuristic Meeting Analysis Engine with multi-task generation & full Hindi/Hinglish support."""

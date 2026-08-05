@@ -1326,14 +1326,25 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSettingsModalBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
 
         saveSettingsBtn.addEventListener('click', async () => {
-            const key = document.getElementById('geminiApiKeyInput').value.trim();
+            const provider = document.getElementById('aiProviderSelect').value;
+            const geminiKey = document.getElementById('geminiApiKeyInput').value.trim();
+            const groqKey = document.getElementById('groqApiKeyInput').value.trim();
+            const openaiKey = document.getElementById('openaiApiKeyInput').value.trim();
+            const ollamaHost = document.getElementById('ollamaHostInput').value.trim();
+
             await fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gemini_api_key: key })
+                body: JSON.stringify({
+                    ai_provider: provider,
+                    gemini_api_key: geminiKey,
+                    groq_api_key: groqKey,
+                    openai_api_key: openaiKey,
+                    ollama_host: ollamaHost
+                })
             });
             settingsModal.classList.add('hidden');
-            alert('Settings saved successfully!');
+            alert('Settings & AI Provider preferences saved successfully!');
         });
     }
 
@@ -1341,8 +1352,25 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/settings');
             const data = await res.json();
+            if (data.ai_provider) {
+                const sel = document.getElementById('aiProviderSelect');
+                if (sel) sel.value = data.ai_provider;
+            }
             if (data.gemini_api_key) {
-                document.getElementById('geminiApiKeyInput').value = data.gemini_api_key;
+                const gInput = document.getElementById('geminiApiKeyInput');
+                if (gInput) gInput.value = data.gemini_api_key;
+            }
+            if (data.groq_api_key) {
+                const grInput = document.getElementById('groqApiKeyInput');
+                if (grInput) grInput.value = data.groq_api_key;
+            }
+            if (data.openai_api_key) {
+                const oInput = document.getElementById('openaiApiKeyInput');
+                if (oInput) oInput.value = data.openai_api_key;
+            }
+            if (data.ollama_host) {
+                const olInput = document.getElementById('ollamaHostInput');
+                if (olInput) olInput.value = data.ollama_host;
             }
         } catch (e) {
             console.error(e);

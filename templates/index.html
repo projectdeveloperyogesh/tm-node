@@ -467,16 +467,47 @@
 
     <!-- Settings Modal -->
     <div class="modal-overlay hidden" id="settingsModal">
-        <div class="modal-card">
+        <div class="modal-card" style="max-width: 550px;">
             <div class="modal-header">
-                <h3><i data-lucide="settings"></i> Application Settings</h3>
+                <h3><i data-lucide="settings"></i> Application & Multi-AI Provider Settings</h3>
                 <button class="icon-btn" id="closeSettingsModalBtn"><i data-lucide="x"></i></button>
             </div>
+            
             <div class="form-group">
-                <label><i data-lucide="key"></i> Google Gemini API Key (Optional)</label>
-                <input type="password" id="geminiApiKeyInput" class="custom-input" placeholder="AIzaSy...">
-                <small class="help-text">Leave blank to use 100% offline local NLP engine. Enter key for cloud LLM reasoning.</small>
+                <label><i data-lucide="cpu"></i> Active AI Intelligence Engine Provider</label>
+                <select id="aiProviderSelect" class="custom-select">
+                    <option value="auto" selected>✨ Auto Resolution (Best Available Provider)</option>
+                    <option value="gemini">🌟 Google Gemini (Gemini 1.5 Flash/Pro)</option>
+                    <option value="groq">⚡ Groq Cloud (Llama 3.3 70B - Ultra Fast)</option>
+                    <option value="openai">🤖 OpenAI (GPT-4o / GPT-4o-mini)</option>
+                    <option value="ollama">🦙 Ollama Local LLM (100% Offline Local Host)</option>
+                    <option value="local">💻 Built-in Local Heuristic NLP (Rule Engine)</option>
+                </select>
             </div>
+
+            <div class="form-group margin-top-15">
+                <label><i data-lucide="key"></i> Google Gemini API Key</label>
+                <input type="password" id="geminiApiKeyInput" class="custom-input" placeholder="AIzaSy...">
+                <small class="help-text">Obtain free key from Google AI Studio.</small>
+            </div>
+
+            <div class="form-group margin-top-15">
+                <label><i data-lucide="zap"></i> Groq API Key (Llama 3.3 70B)</label>
+                <input type="password" id="groqApiKeyInput" class="custom-input" placeholder="gsk_...">
+                <small class="help-text">Obtain free key from console.groq.com.</small>
+            </div>
+
+            <div class="form-group margin-top-15">
+                <label><i data-lucide="bot"></i> OpenAI API Key (GPT-4o)</label>
+                <input type="password" id="openaiApiKeyInput" class="custom-input" placeholder="sk-...">
+            </div>
+
+            <div class="form-group margin-top-15">
+                <label><i data-lucide="server"></i> Ollama Host Endpoint URL (Local GPU/CPU)</label>
+                <input type="text" id="ollamaHostInput" class="custom-input" placeholder="http://localhost:11434">
+                <small class="help-text">Run `ollama run llama3.2` on your machine.</small>
+            </div>
+
             <div class="modal-footer margin-top-20">
                 <button type="button" class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
             </div>

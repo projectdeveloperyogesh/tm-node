@@ -533,14 +533,22 @@ app.delete('/api/tasks/:id', (req, res) => {
 // Settings APIs
 app.get('/api/settings', (req, res) => {
     const settings = loadJson(SETTINGS_FILE, {});
-    res.json({ gemini_api_key: settings.gemini_api_key || "" });
+    res.json({
+        ai_provider: settings.ai_provider || "auto",
+        gemini_api_key: settings.gemini_api_key || "",
+        groq_api_key: settings.groq_api_key || "",
+        openai_api_key: settings.openai_api_key || "",
+        ollama_host: settings.ollama_host || "http://localhost:11434"
+    });
 });
 
 app.post('/api/settings', (req, res) => {
     const settings = loadJson(SETTINGS_FILE, {});
-    if (req.body.gemini_api_key !== undefined) {
-        settings.gemini_api_key = req.body.gemini_api_key;
-    }
+    ["ai_provider", "gemini_api_key", "groq_api_key", "openai_api_key", "ollama_host"].forEach(k => {
+        if (req.body[k] !== undefined) {
+            settings[k] = req.body[k];
+        }
+    });
     saveJson(SETTINGS_FILE, settings);
     res.json({ status: "saved" });
 });
