@@ -540,6 +540,18 @@ app.get('/api/ollama/status', (req, res) => {
 });
 
 app.get('/api/ollama/progress', (req, res) => {
+    const paths = [
+        path.join(__dirname, 'scratch', 'ollama_status.json'),
+        path.join(__dirname, '..', 'python', 'scratch', 'ollama_status.json')
+    ];
+    for (const p of paths) {
+        if (fs.existsSync(p)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+                return res.json(data);
+            } catch (e) {}
+        }
+    }
     const { exec } = require('child_process');
     exec('python -c "import ollama_installer, json; print(json.dumps(ollama_installer.get_ollama_progress()))"', (err, stdout) => {
         try {
@@ -551,15 +563,17 @@ app.get('/api/ollama/progress', (req, res) => {
 });
 
 app.post('/api/ollama/setup', (req, res) => {
-    const { exec } = require('child_process');
+    const { spawn } = require('child_process');
     const model = req.body.model_name || "llama3.2";
-    exec(`python -c "import ollama_installer, json; print(json.dumps(ollama_installer.auto_setup_ollama('${model}')))"`, (err, stdout) => {
-        try {
-            res.json(JSON.parse(stdout.trim()));
-        } catch (e) {
-            res.json({ status: "installing", message: "Auto-setup command sent to background." });
-        }
+    
+    // Spawn detached process so Windows keeps setup running independently
+    const child = spawn('python', ['-c', `import ollama_installer; ollama_installer.run_setup_standalone('${model}')`], {
+        detached: true,
+        stdio: 'ignore'
     });
+    child.unref();
+
+    res.json({ status: "started", message: "Ollama auto-setup initiated." });
 });
 
 // Settings APIs
