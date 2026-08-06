@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import uuid
 import requests
 
 class MeetingAnalyzer:
