@@ -1574,10 +1574,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 bgJobsBadge.style.color = activeJobs.length > 0 ? '#60a5fa' : '#94a3b8';
             }
 
-            const newlyCompleted = jobs.some(j => j.stage === 'completed' && j.finished_at && (Date.now() / 1000 - j.finished_at) < 2.5);
-            if (newlyCompleted) {
+            if (!state.processedJobIds) state.processedJobIds = new Set();
+
+            let hasNewCompletion = false;
+            let newlyCompletedMeetingId = null;
+
+            jobs.forEach(j => {
+                if (j.stage === 'completed' && !state.processedJobIds.has(j.id)) {
+                    state.processedJobIds.add(j.id);
+                    hasNewCompletion = true;
+                    if (j.meeting_id) newlyCompletedMeetingId = j.meeting_id;
+                }
+            });
+
+            if (hasNewCompletion) {
                 await loadMeetings();
                 await loadTasks();
+                if (newlyCompletedMeetingId) {
+                    state.currentMeetingId = newlyCompletedMeetingId;
+                    switchMeetingSession(newlyCompletedMeetingId);
+                }
             }
 
             if (!bgJobsListContainer) return;
