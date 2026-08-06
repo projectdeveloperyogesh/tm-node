@@ -58,6 +58,9 @@ function findPythonExec() {
     return process.platform === 'win32' ? 'python' : 'python3';
 }
 
+let bridgeRestartAttempts = 0;
+let lastBridgeRestartTime = 0;
+
 function startAudioBridge() {
     const pythonExec = findPythonExec();
     const scriptPath = path.join(BASE_DIR, 'node_audio_bridge.py');
@@ -70,6 +73,25 @@ function startAudioBridge() {
 
     bridgeProcess.on('error', (err) => {
         console.warn(`[Node.js Express Server] Audio bridge notice: ${err.message}`);
+    });
+
+    bridgeProcess.on('exit', (code, signal) => {
+        console.warn(`[Node.js Express Server] Audio bridge exited with code ${code}, signal ${signal}`);
+        bridgeProcess = null;
+        
+        const now = Date.now();
+        if (now - lastBridgeRestartTime > 10000) {
+            bridgeRestartAttempts = 0;
+        }
+        
+        if (bridgeRestartAttempts < 5) {
+            bridgeRestartAttempts++;
+            lastBridgeRestartTime = now;
+            console.log(`[Node.js Express Server] Auto-restarting audio bridge (Attempt ${bridgeRestartAttempts}/5)...`);
+            setTimeout(startAudioBridge, 1500);
+        } else {
+            console.error(`[Node.js Express Server] Audio bridge failed multiple times. Web Browser Recorder mode will act as primary.`);
+        }
     });
 }
 startAudioBridge();
@@ -122,6 +144,10 @@ function getGeminiApiKey() {
 // HTTP Helper for Audio Bridge
 function proxyToBridge(method, endpoint, postData = null) {
     return new Promise((resolve, reject) => {
+        if (!bridgeProcess) {
+            startAudioBridge();
+        }
+
         let postBody = '';
         let headers = {};
         if (postData) {
@@ -139,7 +165,8 @@ function proxyToBridge(method, endpoint, postData = null) {
             port: BRIDGE_PORT,
             path: endpoint,
             method: method,
-            headers: headers
+            headers: headers,
+            timeout: 5000
         }, (res) => {
             let data = '';
             res.on('data', chunk => data += chunk);
@@ -150,6 +177,11 @@ function proxyToBridge(method, endpoint, postData = null) {
                     resolve({ statusCode: res.statusCode, body: { detail: data } });
                 }
             });
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Audio bridge response timed out'));
         });
 
         req.on('error', (err) => {

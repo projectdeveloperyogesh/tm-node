@@ -426,10 +426,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         startStatusPolling();
                         lucide.createIcons();
                     } else {
-                        alert('Failed to start recording: ' + (data.detail || data.message || data.status || 'Unknown error'));
+                        console.warn('Desktop WASAPI audio bridge unavailable on this system. Falling back to Browser Recording mode...');
+                        if (engineSelect) engineSelect.value = 'web';
+                        await startWebBrowserRecording();
+                        startRecordBtn.disabled = true;
+                        pauseRecordBtn.disabled = false;
+                        stopRecordBtn.disabled = false;
+                        timerStatusLabel.textContent = 'Browser Recording Live';
+                        recordingStatusPill.textContent = 'Recording (Web)';
+                        alert('🎙️ Desktop soundcard bridge unavailable on this system. Automatically switched to Browser Microphone & Tab Audio recording!');
                     }
                 } catch (e) {
-                    alert('Failed to start recording: ' + e);
+                    console.warn('Desktop WASAPI audio bridge error. Falling back to Browser Recording mode...', e);
+                    if (engineSelect) engineSelect.value = 'web';
+                    try {
+                        await startWebBrowserRecording();
+                        startRecordBtn.disabled = true;
+                        pauseRecordBtn.disabled = false;
+                        stopRecordBtn.disabled = false;
+                        timerStatusLabel.textContent = 'Browser Recording Live';
+                        recordingStatusPill.textContent = 'Recording (Web)';
+                        alert('🎙️ Desktop soundcard bridge unavailable on this system. Automatically switched to Browser Microphone & Tab Audio recording!');
+                    } catch (err) {
+                        alert('Failed to start recording: ' + (err.message || err));
+                    }
                 }
             }
         });
