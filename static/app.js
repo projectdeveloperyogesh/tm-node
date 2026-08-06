@@ -831,7 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Meetings & Insights ---
-    async function loadMeetings() {
+    async function loadMeetings(selectLatest = false) {
         try {
             const res = await fetch('/api/meetings');
             state.meetings = await res.json();
@@ -855,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 meetingSessionSelect.appendChild(opt);
             });
 
-            if (!state.currentMeetingId) {
+            if (selectLatest || !state.currentMeetingId || !state.meetings.some(m => m.id === state.currentMeetingId)) {
                 state.currentMeetingId = state.meetings[0].id;
             }
             switchMeetingSession(state.currentMeetingId);
@@ -1588,7 +1588,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (hasNewCompletion) {
-                await loadMeetings();
+                await loadMeetings(true);
                 await loadTasks();
                 if (newlyCompletedMeetingId) {
                     state.currentMeetingId = newlyCompletedMeetingId;
