@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupTaskBoardEvents();
         setupInsightsEvents();
         setupModalEvents();
+        setupJobsEvents();
         initCanvasWaveform();
     }
 
@@ -571,12 +572,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 micLevelVal.textContent = '0%';
                 speakerLevelVal.textContent = '0%';
 
-                if (data && data.status === 'success' && data.meeting) {
-                    state.currentMeetingId = data.meeting.id;
-                    await loadMeetings();
-                    await loadTasks();
-                    switchMeetingSession(data.meeting.id);
-                    activateTab('insightsTab');
+                if (data && (data.status === 'success' || data.status === 'background_processing')) {
+                    if (data.status === 'background_processing') {
+                        const bgJobsModal = document.getElementById('bgJobsModal');
+                        if (bgJobsModal) bgJobsModal.classList.remove('hidden');
+                        startJobsPolling();
+                    } else if (data.meeting) {
+                        state.currentMeetingId = data.meeting.id;
+                        await loadMeetings();
+                        await loadTasks();
+                        switchMeetingSession(data.meeting.id);
+                        activateTab('insightsTab');
+                    }
                 } else if (data && data.detail) {
                     alert('Error processing recording: ' + data.detail);
                     startRecordBtn.disabled = false;
@@ -752,17 +759,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadProgress.classList.add('hidden');
                 processUploadBtn.disabled = false;
 
-                if (data.status === 'success' && data.meeting) {
+                if (data && (data.status === 'success' || data.status === 'background_processing')) {
                     state.selectedFile = null;
                     selectedFileCard.classList.add('hidden');
                     dropzone.classList.remove('hidden');
                     uploadTitleInput.value = '';
 
-                    state.currentMeetingId = data.meeting.id;
-                    await loadMeetings();
-                    await loadTasks();
-                    switchMeetingSession(data.meeting.id);
-                    activateTab('insightsTab');
+                    const bgJobsModal = document.getElementById('bgJobsModal');
+                    if (bgJobsModal) bgJobsModal.classList.remove('hidden');
+                    startJobsPolling();
+
+                    if (data.meeting) {
+                        state.currentMeetingId = data.meeting.id;
+                        await loadMeetings();
+                        await loadTasks();
+                        switchMeetingSession(data.meeting.id);
+                        activateTab('insightsTab');
+                    }
                 } else {
                     alert('Upload error: ' + (data.detail || 'Failed to process file'));
                 }
@@ -1480,6 +1493,94 @@ document.addEventListener('DOMContentLoaded', () => {
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    // --- Background Processing Jobs Monitor ---
+    function setupJobsEvents() {
+        const openBgJobsBtn = document.getElementById('openBgJobsBtn');
+        const bgJobsModal = document.getElementById('bgJobsModal');
+        const closeBgJobsModalBtn = document.getElementById('closeBgJobsModalBtn');
+        const closeBgJobsFooterBtn = document.getElementById('closeBgJobsFooterBtn');
+
+        if (openBgJobsBtn && bgJobsModal) {
+            openBgJobsBtn.addEventListener('click', () => {
+                bgJobsModal.classList.remove('hidden');
+                loadJobs();
+            });
+        }
+
+        if (closeBgJobsModalBtn && bgJobsModal) {
+            closeBgJobsModalBtn.addEventListener('click', () => bgJobsModal.classList.add('hidden'));
+        }
+        if (closeBgJobsFooterBtn && bgJobsModal) {
+            closeBgJobsFooterBtn.addEventListener('click', () => bgJobsModal.classList.add('hidden'));
+        }
+
+        startJobsPolling();
+    }
+
+    function startJobsPolling() {
+        if (state.jobsPollInterval) return;
+        loadJobs();
+        state.jobsPollInterval = setInterval(loadJobs, 1500);
+    }
+
+    async function loadJobs() {
+        try {
+            const res = await fetch('/api/jobs');
+            const jobs = await res.json();
+
+            const bgJobsBadge = document.getElementById('bgJobsBadge');
+            const bgJobsListContainer = document.getElementById('bgJobsListContainer');
+
+            const activeJobs = jobs.filter(j => j.stage !== 'completed' && j.stage !== 'error');
+            
+            if (bgJobsBadge) {
+                bgJobsBadge.textContent = `${activeJobs.length} Running`;
+                bgJobsBadge.style.background = activeJobs.length > 0 ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)';
+                bgJobsBadge.style.color = activeJobs.length > 0 ? '#60a5fa' : '#94a3b8';
+            }
+
+            const newlyCompleted = jobs.some(j => j.stage === 'completed' && j.finished_at && (Date.now() / 1000 - j.finished_at) < 2.5);
+            if (newlyCompleted) {
+                await loadMeetings();
+                await loadTasks();
+            }
+
+            if (!bgJobsListContainer) return;
+
+            if (jobs.length === 0) {
+                bgJobsListContainer.innerHTML = '<p class="empty-state">No background processing tasks active.</p>';
+                return;
+            }
+
+            bgJobsListContainer.innerHTML = '';
+            jobs.forEach(j => {
+                const card = document.createElement('div');
+                card.className = 'item-topic-card';
+                card.style.marginBottom = '10px';
+                
+                let badgeClass = 'badge-primary';
+                if (j.stage === 'completed') badgeClass = 'badge-success';
+                else if (j.stage === 'error') badgeClass = 'badge-danger';
+                else if (j.stage === 'transcribing' || j.stage === 'analyzing') badgeClass = 'badge-category';
+
+                card.innerHTML = `
+                    <div class="flex-between">
+                        <div style="font-weight: 600; color: #f8fafc;"><i data-lucide="cpu" style="width: 15px; height: 15px; vertical-align: middle; margin-right: 6px; color: var(--accent-cyan);"></i> ${escapeHtml(j.meeting_title || 'Session')}</div>
+                        <span class="badge ${badgeClass}">${j.stage.toUpperCase()}</span>
+                    </div>
+                    <div class="margin-top-5 help-text" style="color: #cbd5e1; font-size: 0.85rem;">${escapeHtml(j.status_message || '')}</div>
+                    <div class="progress-bar-track" style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 8px;">
+                        <div class="progress-bar-fill" style="width: ${j.progress || 0}%; height: 100%; background: linear-gradient(90deg, #38bdf8, #c084fc); transition: width 0.3s ease;"></div>
+                    </div>
+                `;
+                bgJobsListContainer.appendChild(card);
+            });
+            lucide.createIcons();
+        } catch (e) {
+            console.error('loadJobs notice:', e);
+        }
     }
 
     function escapeHtml(str) {

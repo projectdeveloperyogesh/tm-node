@@ -35,6 +35,11 @@
                     <i data-lucide="check-square"></i>
                     <span id="totalTasksCount">0 Tasks</span>
                 </div>
+                <button id="openBgJobsBtn" class="btn btn-secondary btn-sm flex-align-center gap-5" title="View background meeting processing tasks">
+                    <i data-lucide="cpu" class="accent-icon"></i>
+                    <span>Jobs Monitor</span>
+                    <span id="bgJobsBadge" class="badge badge-category" style="background: rgba(59,130,246,0.2); color: #60a5fa; margin-left: 4px;">0 Running</span>
+                </button>
                 <button class="icon-btn" id="openSettingsBtn" title="Settings">
                     <i data-lucide="settings"></i>
                 </button>
@@ -526,6 +531,24 @@
 
             <div class="modal-footer margin-top-20">
                 <button type="button" class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Background Processing Jobs Monitor Modal -->
+    <div class="modal-overlay hidden" id="bgJobsModal">
+        <div class="modal-card" style="max-width: 650px;">
+            <div class="modal-header flex-between">
+                <h3><i data-lucide="cpu" class="accent-icon"></i> Background Processing Jobs Monitor</h3>
+                <button class="icon-btn" id="closeBgJobsModalBtn"><i data-lucide="x"></i></button>
+            </div>
+            <p class="help-text margin-bottom-15">All meeting recordings & uploads process in non-blocking background workers, allowing you to start new recording sessions immediately.</p>
+            <div id="bgJobsListContainer" class="items-list" style="max-height: 380px; overflow-y: auto;">
+                <p class="empty-state">No background processing tasks active.</p>
+            </div>
+            <div class="modal-footer margin-top-20 flex-between">
+                <span class="help-text" style="font-size: 0.8rem; color: #94a3b8;">Auto-refreshing live progress...</span>
+                <button type="button" class="btn btn-primary" id="closeBgJobsFooterBtn">Close Monitor</button>
             </div>
         </div>
     </div>

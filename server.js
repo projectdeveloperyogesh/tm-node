@@ -181,6 +181,15 @@ app.get('/api/devices', async (req, res) => {
     }
 });
 
+app.get('/api/jobs', async (req, res) => {
+    try {
+        const bridgeRes = await proxyToBridge('GET', '/jobs');
+        res.status(bridgeRes.statusCode).json(bridgeRes.body);
+    } catch (err) {
+        res.json([]);
+    }
+});
+
 // Desktop Audio Recording Start
 app.post('/api/record/start', async (req, res) => {
     try {

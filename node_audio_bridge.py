@@ -57,33 +57,60 @@ def toggle_mute(target: str = Form(...)):
 def get_status():
     return recorder.get_status()
 
+from background_job_manager import dispatch_background_meeting, get_all_jobs, get_job
+
+@app.get("/jobs")
+def list_jobs():
+    return get_all_jobs()
+
 @app.post("/stop")
 def stop_recording(meeting_title: str = Form("Live Recorded Meeting"), target_language: str = Form("English")):
     res = recorder.stop_recording()
     if res.get("status") in ["success", "recording_stopped"] and ("file" in res or "filepath" in res):
         wav_path = res.get("file") or res.get("filepath")
-        
-        # Transcribe actual spoken audio using SpeechRecognition
-        trans_res = speech_engine.transcribe_audio(wav_path)
-        transcript_text = trans_res.get("text", "")
-        segments = trans_res.get("segments", [])
+        live_trans = res.get("live_transcript", [])
 
-        if not transcript_text or len(transcript_text.strip()) == 0:
-            transcript_text = f"Audio recorded for session '{meeting_title}'. Ensure microphone or speaker audio is active."
-            segments = [{"start": "00:00", "end": "End", "speaker": "Participant", "text": transcript_text}]
+        # Load helper functions for JSON persistence
+        def _load_json(file_path, default_val):
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                except Exception:
+                    pass
+            return default_val
 
-        analyzer = MeetingAnalyzer()
-        analysis = analyzer.analyze_meeting(transcript_text, meeting_title=meeting_title, target_language=target_language)
+        def _save_json(file_path, data):
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"Error saving JSON to {file_path}: {e}")
+
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+        meetings_file = os.path.join(data_dir, "meetings.json")
+        tasks_file = os.path.join(data_dir, "tasks.json")
+
+        job = dispatch_background_meeting(
+            filepath=wav_path,
+            meeting_title=meeting_title,
+            target_language=target_language,
+            live_trans=live_trans,
+            speech_engine=speech_engine,
+            get_analyzer_func=lambda: MeetingAnalyzer(),
+            load_json_func=_load_json,
+            save_json_func=_save_json,
+            meetings_file=meetings_file,
+            tasks_file=tasks_file
+        )
 
         return {
-            "status": "success",
+            "status": "background_processing",
+            "message": "Recording session released! Processing in background.",
             "file_path": wav_path,
             "filename": os.path.basename(wav_path),
-            "transcript": transcript_text,
-            "segments": segments,
-            "summary": analysis.get("summary", ""),
-            "items_discussed": analysis.get("items_discussed", []),
-            "tasks": analysis.get("tasks", [])
+            "job": job
         }
     else:
         raise HTTPException(status_code=400, detail=res.get("message", "Failed to stop recording"))
