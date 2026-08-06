@@ -605,14 +605,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         activateTab('insightsTab');
                     }
                 } else if (data && data.detail) {
-                    alert('Error processing recording: ' + data.detail);
-                    startRecordBtn.disabled = false;
+                    if (data.detail.includes('ECONNRESET') || data.detail.includes('reset') || data.detail.includes('timed out')) {
+                        const bgJobsModal = document.getElementById('bgJobsModal');
+                        if (bgJobsModal) bgJobsModal.classList.remove('hidden');
+                        startJobsPolling();
+                    } else {
+                        alert('Error processing recording: ' + data.detail);
+                        startRecordBtn.disabled = false;
+                    }
                 }
             } catch (e) {
-                alert('Error processing recording: ' + (e.message || e));
-                startRecordBtn.disabled = false;
-                stopRecordBtn.disabled = false;
-                timerStatusLabel.textContent = 'Standby';
+                const errStr = (e.message || String(e)).toLowerCase();
+                if (errStr.includes('econnreset') || errStr.includes('reset') || errStr.includes('failed to fetch') || errStr.includes('networkerror')) {
+                    const bgJobsModal = document.getElementById('bgJobsModal');
+                    if (bgJobsModal) bgJobsModal.classList.remove('hidden');
+                    startJobsPolling();
+                } else {
+                    alert('Error processing recording: ' + (e.message || e));
+                    startRecordBtn.disabled = false;
+                    stopRecordBtn.disabled = false;
+                    timerStatusLabel.textContent = 'Standby';
+                }
             }
             lucide.createIcons();
         });
