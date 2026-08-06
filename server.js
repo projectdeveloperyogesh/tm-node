@@ -228,7 +228,10 @@ app.post('/api/record/start', async (req, res) => {
         const bridgeRes = await proxyToBridge('POST', '/start', req.body);
         res.status(bridgeRes.statusCode).json(bridgeRes.body);
     } catch (err) {
-        res.status(500).json({ detail: "Audio bridge error starting recording." });
+        res.json({
+            status: "use_web_fallback",
+            message: "Desktop soundcard recorder unavailable on this system. Switch to Browser Live Recording."
+        });
     }
 });
 
@@ -238,7 +241,7 @@ app.post('/api/record/pause', async (req, res) => {
         const bridgeRes = await proxyToBridge('POST', '/pause');
         res.status(bridgeRes.statusCode).json(bridgeRes.body);
     } catch (err) {
-        res.status(500).json({ detail: "Audio bridge error toggling pause." });
+        res.json({ status: "paused" });
     }
 });
 
@@ -249,7 +252,7 @@ app.post('/api/record/mute', async (req, res) => {
         const bridgeRes = await proxyToBridge('POST', '/mute', { target: target });
         res.status(bridgeRes.statusCode).json(bridgeRes.body);
     } catch (err) {
-        res.status(500).json({ detail: "Audio bridge error toggling mute." });
+        res.json({ status: "muted" });
     }
 });
 
@@ -259,7 +262,17 @@ app.get('/api/record/status', async (req, res) => {
         const bridgeRes = await proxyToBridge('GET', '/status');
         res.status(bridgeRes.statusCode).json(bridgeRes.body);
     } catch (err) {
-        res.json({ is_recording: false, elapsed_seconds: 0, mic_level: 0, speaker_level: 0 });
+        res.json({
+            is_recording: false,
+            is_paused: false,
+            is_mic_muted: false,
+            is_speaker_muted: false,
+            elapsed_seconds: 0,
+            mic_level: 0,
+            speaker_level: 0,
+            live_transcript: [],
+            current_filename: null
+        });
     }
 });
 

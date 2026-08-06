@@ -100,54 +100,65 @@ class DualAudioRecorder:
 
     def get_audio_devices(self):
         """Enumerate microphones and native WASAPI loopback speaker output devices."""
-        p = pyaudio.PyAudio()
         mic_devices = []
         speaker_devices = []
 
-        try:
-            default_input_idx = p.get_default_input_device_info()["index"]
-        except Exception:
-            default_input_idx = None
+        if not HAS_PYAUDIO:
+            return {
+                "microphones": [{"id": 0, "name": "Default System Microphone", "is_default": True}],
+                "speakers": [{"id": 1, "name": "Default System Speaker Loopback", "is_default": True}]
+            }
 
         try:
-            default_output_idx = p.get_default_output_device_info()["index"]
-        except Exception:
-            default_output_idx = None
-
-        # Enumerate Microphones
-        for i in range(p.get_device_count()):
-            dev = p.get_device_info_by_index(i)
-            if dev["maxInputChannels"] > 0 and not dev.get("isLoopbackDevice", False):
-                mic_devices.append({
-                    "id": i,
-                    "name": f"{dev['name']}",
-                    "is_default": i == default_input_idx
-                })
-
-        # Enumerate Native WASAPI Loopback Speakers
-        if HAS_PYAUDIOWPATCH:
+            p = pyaudio.PyAudio()
             try:
-                for dev in p.get_loopback_device_info_generator():
-                    speaker_devices.append({
-                        "id": dev["index"],
-                        "name": f"[System Speaker] {dev['name']}",
-                        "is_default": True if (default_output_idx is not None and str(default_output_idx) in str(dev['index'])) or len(speaker_devices) == 0 else False
-                    })
-            except Exception as e:
-                print(f"Error enumerating WASAPI loopbacks: {e}")
+                default_input_idx = p.get_default_input_device_info()["index"]
+            except Exception:
+                default_input_idx = None
 
-        if not speaker_devices:
+            try:
+                default_output_idx = p.get_default_output_device_info()["index"]
+            except Exception:
+                default_output_idx = None
+
+            # Enumerate Microphones
             for i in range(p.get_device_count()):
-                dev = p.get_device_info_by_index(i)
-                if dev["maxOutputChannels"] > 0 or "loopback" in dev["name"].lower():
-                    speaker_devices.append({
-                        "id": i,
-                        "name": f"[System Audio] {dev['name']}",
-                        "is_default": i == default_output_idx
-                    })
+                try:
+                    dev = p.get_device_info_by_index(i)
+                    if dev["maxInputChannels"] > 0 and not dev.get("isLoopbackDevice", False):
+                        mic_devices.append({
+                            "id": i,
+                            "name": f"{dev['name']}",
+                            "is_default": i == default_input_idx
+                        })
+                except Exception:
+                    pass
 
-        p.terminate()
-        return {"microphones": mic_devices, "speakers": speaker_devices}
+            # Enumerate Native WASAPI Loopback Speakers
+            if HAS_PYAUDIOWPATCH:
+                try:
+                    for dev in p.get_loopback_device_info_generator():
+                        speaker_devices.append({
+                            "id": dev["index"],
+                            "name": f"[System Speaker] {dev['name']}",
+                            "is_default": dev.get("isDefaultLoopbackDevice", False)
+                        })
+                except Exception:
+                    pass
+
+            p.terminate()
+        except Exception as e:
+            print(f"Audio device enumeration notice: {e}")
+
+        if not mic_devices:
+            mic_devices.append({"id": 0, "name": "Default System Microphone", "is_default": True})
+        if not speaker_devices:
+            speaker_devices.append({"id": 1, "name": "Default System Speaker Loopback", "is_default": True})
+
+        return {
+            "microphones": mic_devices,
+            "speakers": speaker_devices
+        }
 
     def start_recording(self, mic_id=None, speaker_id=None):
         if self.is_recording:

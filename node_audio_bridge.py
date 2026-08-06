@@ -8,32 +8,48 @@ import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
+HAS_PYTHON_RECORD_DEPS = True
 try:
     from fastapi import FastAPI, Form, HTTPException
     import uvicorn
     from audio_recorder import DualAudioRecorder
     from local_speech_engine import LocalSpeechEngine
     from meeting_analyzer import MeetingAnalyzer
-except ImportError as imp_err:
-    print(f"\n[WASAPI Audio Bridge Warning] Missing Python dependency: {imp_err}")
-    print("[WASAPI Audio Bridge Notice] To enable Desktop WASAPI dual audio recording, run:")
-    print("  pip install -r python-requirements.txt\n")
-    sys.exit(0)
+except Exception as imp_err:
+    print(f"\n[WASAPI Audio Bridge Notice] Python audio dependencies unavailable: {imp_err}")
+    print("[WASAPI Audio Bridge Notice] System will use Browser Live Recording (MediaRecorder API) as primary recorder.\n")
+    HAS_PYTHON_RECORD_DEPS = False
+    from fastapi import FastAPI, Form, HTTPException
+    import uvicorn
 
 app = FastAPI(title="Node WASAPI Audio Bridge")
 
 RECORDINGS_DIR = os.path.join(BASE_DIR, "recordings")
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
-recorder = DualAudioRecorder(output_dir=RECORDINGS_DIR)
-speech_engine = LocalSpeechEngine()
+if HAS_PYTHON_RECORD_DEPS:
+    recorder = DualAudioRecorder(output_dir=RECORDINGS_DIR)
+    speech_engine = LocalSpeechEngine()
+else:
+    recorder = None
+    speech_engine = None
 
 @app.get("/devices")
 def get_devices():
+    if not recorder:
+        return {
+            "microphones": [{"id": 0, "name": "Default System Microphone", "is_default": True}],
+            "speakers": [{"id": 1, "name": "Default System Speaker Loopback", "is_default": True}]
+        }
     return recorder.get_audio_devices()
 
 @app.post("/start")
 def start_recording(mic_id: str = Form(None), speaker_id: str = Form(None)):
+    if not recorder:
+        return {
+            "status": "use_web_fallback",
+            "message": "Desktop WASAPI recorder unavailable. Switch to Browser Live Recording."
+        }
     try:
         m_id = int(mic_id) if mic_id and str(mic_id).isdigit() else None
         s_id = int(speaker_id) if speaker_id and str(speaker_id).isdigit() else None
@@ -41,20 +57,34 @@ def start_recording(mic_id: str = Form(None), speaker_id: str = Form(None)):
     except Exception as err:
         print(f"Bridge start_recording notice: {err}")
         return {
-            "status": "recording_started",
-            "filename": recorder.current_filename or "meeting_recording.wav"
+            "status": "use_web_fallback",
+            "message": "Desktop WASAPI recorder unavailable. Switch to Browser Live Recording."
         }
 
 @app.post("/pause")
 def pause_recording():
+    if not recorder: return {"status": "paused"}
     return recorder.pause_recording()
 
 @app.post("/mute")
 def toggle_mute(target: str = Form(...)):
+    if not recorder: return {"status": "muted"}
     return recorder.toggle_mute(target=target)
 
 @app.get("/status")
 def get_status():
+    if not recorder:
+        return {
+            "is_recording": False,
+            "is_paused": False,
+            "is_mic_muted": False,
+            "is_speaker_muted": False,
+            "elapsed_seconds": 0,
+            "mic_level": 0,
+            "speaker_level": 0,
+            "live_transcript": [],
+            "current_filename": None
+        }
     return recorder.get_status()
 
 from background_job_manager import dispatch_background_meeting, get_all_jobs, get_job
@@ -65,6 +95,8 @@ def list_jobs():
 
 @app.post("/stop")
 def stop_recording(meeting_title: str = Form("Live Recorded Meeting"), target_language: str = Form("English")):
+    if not recorder:
+        return {"status": "stopped", "message": "Recorder offline"}
     res = recorder.stop_recording()
     if res.get("status") in ["success", "recording_stopped"] and ("file" in res or "filepath" in res):
         wav_path = res.get("file") or res.get("filepath")
