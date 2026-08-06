@@ -151,7 +151,7 @@ def process_background_meeting(
             existing_tasks.insert(0, task)
         save_json_func(tasks_file, existing_tasks)
 
-        update_job(job_id, stage="completed", status_message="✅ Meeting processing completed & saved!", progress=100, meeting_id=meeting_id)
+        update_job(job_id, stage="completed", status_message="Meeting processing completed & saved!", progress=100, meeting_id=meeting_id)
 
     except Exception as e:
         print(f"Background job unexpected error [{job_id}]: {e}")
