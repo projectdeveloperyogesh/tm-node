@@ -312,13 +312,15 @@ app.post('/api/record/stop_web', uploadRecordings.single('file'), async (req, re
             return res.status(400).json({ detail: "No audio file received." });
         }
 
+        const liveTranscript = req.body.live_transcript || "";
+
         const processedWav = await mediaProcessor.processMediaFile(file.path);
         const apiKey = getGeminiApiKey();
         const analyzer = new MeetingAnalyzer(apiKey);
         const speechService = new SpeechService(apiKey);
 
         let analysis = await analyzer.analyzeAudioFile(processedWav, meetingTitle, targetLanguage);
-        let transcriptText = analysis.transcript;
+        let transcriptText = liveTranscript.trim() || analysis.transcript;
 
         if (!transcriptText || transcriptText.trim().length === 0) {
             const transcribeRes = await speechService.transcribeAudio(processedWav);

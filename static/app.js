@@ -297,9 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let webWavEncoder = null;
     let webTimerInterval = null;
     let webSecondsElapsed = 0;
+    let webSpeechRecognizer = null;
+    let webLiveTranscriptText = "";
 
     async function startWebBrowserRecording() {
         webSecondsElapsed = 0;
+        webLiveTranscriptText = "";
         webWavEncoder = new WebWavEncoder();
         
         await webWavEncoder.start((level) => {
@@ -312,6 +315,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.isRecording = true;
         state.isPaused = false;
+
+        // Initialize Web Speech Recognition API if available in browser
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+            try {
+                webSpeechRecognizer = new SpeechRec();
+                webSpeechRecognizer.continuous = true;
+                webSpeechRecognizer.interimResults = true;
+                webSpeechRecognizer.lang = 'en-US';
+
+                webSpeechRecognizer.onresult = (event) => {
+                    let interim = '';
+                    let final = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            final += event.results[i][0].transcript + ' ';
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
+                    }
+
+                    if (final.trim()) {
+                        webLiveTranscriptText += final + ' ';
+                        if (liveTranscriptContainer) {
+                            const timeStr = String(Math.floor(webSecondsElapsed / 60)).padStart(2, '0') + ':' + String(webSecondsElapsed % 60).padStart(2, '0');
+                            const div = document.createElement('div');
+                            div.className = 'transcript-line';
+                            div.innerHTML = `<span class="speaker" style="color: var(--accent-cyan);">[${timeStr}] Live Speaker:</span> ${escapeHtml(final.trim())}`;
+                            liveTranscriptContainer.appendChild(div);
+                            liveTranscriptContainer.scrollTop = liveTranscriptContainer.scrollHeight;
+                        }
+                    }
+                };
+
+                webSpeechRecognizer.onerror = (e) => {
+                    console.warn('Web Speech Recognition notice:', e.error);
+                };
+
+                webSpeechRecognizer.onend = () => {
+                    if (state.isRecording && webSpeechRecognizer) {
+                        try { webSpeechRecognizer.start(); } catch (err) {}
+                    }
+                };
+
+                webSpeechRecognizer.start();
+            } catch (recErr) {
+                console.warn('Could not start web speech recognizer:', recErr);
+            }
+        }
 
         webTimerInterval = setInterval(() => {
             if (state.isRecording && !state.isPaused) {
@@ -332,6 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
             webTimerInterval = null;
         }
 
+        if (webSpeechRecognizer) {
+            try { webSpeechRecognizer.stop(); } catch (e) {}
+            webSpeechRecognizer = null;
+        }
+
         if (!webWavEncoder) {
             throw new Error("Web recording session was not active.");
         }
@@ -347,6 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', audioBlob, 'live_web_recording.wav');
         formData.append('meeting_title', title);
         formData.append('target_language', targetLanguage);
+        if (webLiveTranscriptText.trim()) {
+            formData.append('live_transcript', webLiveTranscriptText.trim());
+        }
 
         const res = await fetch('/api/record/stop_web', {
             method: 'POST',
