@@ -38,7 +38,7 @@ class TaskPulseDesktopClient:
         style.theme_use('clam')
 
         # Header
-        header_frame = tk.Frame(self.root, bg="#101726", padding=15)
+        header_frame = tk.Frame(self.root, bg="#101726", padx=15, pady=15)
         header_frame.pack(fill="x")
 
         title_lbl = tk.Label(
