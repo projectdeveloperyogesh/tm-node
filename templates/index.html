@@ -331,21 +331,6 @@
                             </div>
                         </div>
 
-                        <!-- NEW: Formatted Chat Agent Description Card (Full Chat Response Format) -->
-                        <div class="glass-card margin-top-20">
-                            <div class="card-header flex-between">
-                                <h2><i data-lucide="bot" class="accent-icon"></i> Formatted AI Chat Assistant Output</h2>
-                                <div class="flex-align-center gap-10">
-                                    <button id="copyInsightsReportBtn" class="btn btn-primary btn-xs" title="Copy Full Formatted Chat Report"><i data-lucide="copy"></i> Copy Full Description</button>
-                                    <span class="badge badge-success">Full Chat Output</span>
-                                </div>
-                            </div>
-                            <p class="help-text margin-top-5" style="color: #94a3b8; font-size: 0.82rem;">Decoded full description formatted like a chat AI assistant response (ready to copy & paste into Slack, Docs, or Chat):</p>
-                            <div class="form-group margin-top-10">
-                                <textarea id="insightsFormattedReportText" class="custom-input" style="height: 240px; font-family: system-ui, -apple-system, sans-serif; font-size: 0.88rem; line-height: 1.5; background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(56, 189, 248, 0.3); white-space: pre-wrap;" readonly placeholder="Formatted full description chat output will appear here..."></textarea>
-                            </div>
-                        </div>
-
                         <!-- NEW: Decoded Raw AI Response & JSON Schema Inspector -->
                         <div class="glass-card margin-top-20">
                             <div class="card-header flex-between">
@@ -382,6 +367,35 @@
                                 <p class="empty-state">Transcript will appear here.</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- FULL-WIDTH SECTION: Formatted AI Chat Assistant Output -->
+                <div class="glass-card margin-top-30" style="width: 100%; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(15, 23, 42, 0.85); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);">
+                    <div class="card-header flex-between" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px;">
+                        <div>
+                            <h2 style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;"><i data-lucide="bot" style="color: var(--accent-cyan); width: 22px; height: 22px;"></i> Formatted AI Chat Assistant Output</h2>
+                            <p class="help-text" style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">Full decoded AI assistant response formatted like a chat engine output (ready to copy & paste).</p>
+                        </div>
+                        <div class="flex-align-center gap-10">
+                            <button id="expandChatReportBtn" class="btn btn-secondary btn-sm" title="Expand to Full Window Screen Mode"><i data-lucide="maximize-2"></i> Full Window Screen</button>
+                            <button id="copyInsightsReportBtn" class="btn btn-primary btn-sm" title="Copy Full Formatted Chat Report"><i data-lucide="copy"></i> Copy Full Description</button>
+                            <span class="badge badge-success">Full Width Section</span>
+                        </div>
+                    </div>
+
+                    <!-- Dual View Sub-Tabs (Rich Rendered Chat Document vs Plain Text Copyable View) -->
+                    <div class="flex-align-center gap-10 margin-top-15" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                        <button class="btn btn-secondary btn-xs active" id="viewRichReportTab" style="font-size: 0.85rem; padding: 6px 16px; border-radius: 6px;"><i data-lucide="layout"></i> Rich Chat Document View</button>
+                        <button class="btn btn-secondary btn-xs" id="viewTextReportTab" style="font-size: 0.85rem; padding: 6px 16px; border-radius: 6px;"><i data-lucide="file-text"></i> Copyable Text Description</button>
+                    </div>
+
+                    <div id="richReportContainer" class="margin-top-15" style="padding: 24px; background: rgba(15, 23, 42, 0.7); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); min-height: 250px;">
+                        <div id="insightsFormattedReportHtml" style="line-height: 1.6; color: #f8fafc; font-size: 0.95rem;">Select or process a meeting session to render the full chat assistant description.</div>
+                    </div>
+
+                    <div id="textReportContainer" class="margin-top-15 hidden">
+                        <textarea id="insightsFormattedReportText" class="custom-input" style="height: 380px; width: 100%; font-family: system-ui, -apple-system, sans-serif; font-size: 0.9rem; line-height: 1.6; background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid rgba(56, 189, 248, 0.3); white-space: pre-wrap;" readonly placeholder="Formatted full description chat output will appear here..."></textarea>
                     </div>
                 </div>
             </section>
@@ -697,10 +711,30 @@
                 <button type="button" class="btn btn-primary" id="closeAiLogDetailFooterBtn">Close Inspector</button>
             </div>
         </div>
+    <!-- Full Window Screen Viewer Modal -->
+    <div id="fullScreenChatModal" class="modal hidden" style="position: fixed; inset: 0; z-index: 99999; background: #090d16; display: flex; flex-direction: column; padding: 25px;">
+        <div class="flex-between" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px; margin-bottom: 20px;">
+            <div class="flex-align-center gap-12">
+                <div style="background: rgba(56, 189, 248, 0.15); padding: 10px; border-radius: 10px; border: 1px solid rgba(56, 189, 248, 0.3);">
+                    <i data-lucide="bot" style="width: 28px; height: 28px; color: var(--accent-cyan); display: block;"></i>
+                </div>
+                <div>
+                    <h1 style="font-size: 1.4rem; color: #f8fafc; margin: 0; font-weight: 700;">Full Window Screen Mode - Formatted AI Chat Assistant Output</h1>
+                    <p style="margin: 3px 0 0 0; color: #94a3b8; font-size: 0.85rem;">Decoded full description formatted like a chat AI assistant response (ready to copy & paste).</p>
+                </div>
+            </div>
+            <div class="flex-align-center gap-10">
+                <button id="copyModalReportBtn" class="btn btn-primary btn-sm"><i data-lucide="copy"></i> Copy Full Description</button>
+                <button id="closeFullScreenChatModalBtn" class="btn btn-secondary btn-sm"><i data-lucide="x"></i> Exit Full Screen Mode</button>
+            </div>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 30px; background: rgba(15, 23, 42, 0.85); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
+            <div id="modalFormattedReportHtml" style="line-height: 1.7; color: #f8fafc; font-size: 1.05rem; max-width: 1200px; margin: 0 auto;"></div>
+        </div>
     </div>
 
     <!-- Scripts -->
-    <script src="/static/app.js?v=1.1.0"></script>
+    <script src="/static/app.js?v=1.1.1"></script>
     <script>
         lucide.createIcons();
     </script>

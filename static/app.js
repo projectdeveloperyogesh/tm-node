@@ -1085,6 +1085,51 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const expandChatReportBtn = document.getElementById('expandChatReportBtn');
+        const fullScreenChatModal = document.getElementById('fullScreenChatModal');
+        const closeFullScreenChatModalBtn = document.getElementById('closeFullScreenChatModalBtn');
+        const copyModalReportBtn = document.getElementById('copyModalReportBtn');
+
+        if (expandChatReportBtn && fullScreenChatModal) {
+            expandChatReportBtn.addEventListener('click', () => {
+                const richHtml = document.getElementById('insightsFormattedReportHtml').innerHTML;
+                document.getElementById('modalFormattedReportHtml').innerHTML = richHtml;
+                fullScreenChatModal.classList.remove('hidden');
+                lucide.createIcons();
+            });
+        }
+
+        if (closeFullScreenChatModalBtn && fullScreenChatModal) {
+            closeFullScreenChatModalBtn.addEventListener('click', () => fullScreenChatModal.classList.add('hidden'));
+        }
+
+        if (copyModalReportBtn) {
+            copyModalReportBtn.addEventListener('click', () => {
+                const txt = document.getElementById('insightsFormattedReportText').value;
+                copyToClipboard(txt, 'Formatted AI Chat Assistant Description copied to clipboard!');
+            });
+        }
+
+        const viewRichReportTab = document.getElementById('viewRichReportTab');
+        const viewTextReportTab = document.getElementById('viewTextReportTab');
+        const richReportContainer = document.getElementById('richReportContainer');
+        const textReportContainer = document.getElementById('textReportContainer');
+
+        if (viewRichReportTab && viewTextReportTab) {
+            viewRichReportTab.addEventListener('click', () => {
+                viewRichReportTab.classList.add('active');
+                viewTextReportTab.classList.remove('active');
+                if (richReportContainer) richReportContainer.classList.remove('hidden');
+                if (textReportContainer) textReportContainer.classList.add('hidden');
+            });
+            viewTextReportTab.addEventListener('click', () => {
+                viewTextReportTab.classList.add('active');
+                viewRichReportTab.classList.remove('active');
+                if (textReportContainer) textReportContainer.classList.remove('hidden');
+                if (richReportContainer) richReportContainer.classList.add('hidden');
+            });
+        }
+
         const copyInsightsReportBtn = document.getElementById('copyInsightsReportBtn');
         if (copyInsightsReportBtn) {
             copyInsightsReportBtn.addEventListener('click', () => {
@@ -1351,6 +1396,83 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             insightsFormattedReportText.value = chatReport;
+        }
+
+        // Render Rich HTML Version for Full Width & Full Screen Mode
+        const insightsFormattedReportHtml = document.getElementById('insightsFormattedReportHtml');
+        if (insightsFormattedReportHtml) {
+            let html = `
+                <div style="background: rgba(30, 41, 59, 0.4); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <h2 style="font-size: 1.3rem; font-weight: 700; color: #f8fafc; margin: 0;"><i data-lucide="sparkles" style="color: var(--accent-cyan); width: 20px; height: 20px; vertical-align: middle; margin-right: 8px;"></i> ${escapeHtml(meeting.title || 'Live Meeting Session')}</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <span class="badge badge-category">${escapeHtml(meeting.created_at || 'Recent')}</span>
+                            <span class="badge badge-primary">Language: ${escapeHtml(meeting.language || 'English')}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="font-size: 1.1rem; color: #38bdf8; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;"><i data-lucide="file-text" style="width: 18px; height: 18px;"></i> Executive Summary</h3>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 18px; border-radius: 10px; border-left: 4px solid #38bdf8; color: #e2e8f0; font-size: 0.98rem; line-height: 1.6;">
+                        ${escapeHtml(meeting.summary || 'No summary available.')}
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="font-size: 1.1rem; color: #c084fc; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i data-lucide="list-checks" style="width: 18px; height: 18px;"></i> Key Topics & Items Discussed (${meeting.items_discussed ? meeting.items_discussed.length : 0})</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+            `;
+
+            if (meeting.items_discussed && meeting.items_discussed.length > 0) {
+                meeting.items_discussed.forEach((item, idx) => {
+                    html += `
+                        <div style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(192, 132, 252, 0.2);">
+                            <div style="font-weight: 600; color: #f8fafc; font-size: 0.95rem; margin-bottom: 6px;"><i data-lucide="tag" style="width: 14px; height: 14px; color: #c084fc; margin-right: 6px;"></i> ${escapeHtml(item.topic || 'Topic')}</div>
+                            <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5;">${escapeHtml(item.details || '')}</div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `<div style="color: #94a3b8; font-style: italic;">No specific discussion topics extracted.</div>`;
+            }
+
+            html += `
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 25px;">
+                    <h3 style="font-size: 1.1rem; color: #4ade80; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i data-lucide="check-square" style="width: 18px; height: 18px;"></i> Extracted Action Items & Milestones (${meetingTasks.length})</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+            `;
+
+            if (meetingTasks.length > 0) {
+                meetingTasks.forEach((t, idx) => {
+                    const pClass = (t.priority || 'Medium').toLowerCase();
+                    html += `
+                        <div style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid rgba(74, 222, 128, 0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 6px;">
+                                <div style="font-weight: 600; color: #f8fafc; font-size: 1rem;"><i data-lucide="target" style="width: 16px; height: 16px; color: #4ade80; margin-right: 8px; vertical-align: middle;"></i> ${escapeHtml(t.title)}</div>
+                                <span class="badge badge-${pClass}">${escapeHtml(t.priority || 'Medium')}</span>
+                            </div>
+                            <div style="font-size: 0.88rem; color: #cbd5e1; margin-bottom: 8px;">${escapeHtml(t.description || '')}</div>
+                            <div style="display: flex; gap: 20px; font-size: 0.82rem; color: #94a3b8;">
+                                <span>👤 Assignee: <strong style="color: #e2e8f0;">${escapeHtml(t.assignee || 'Unassigned')}</strong></span>
+                                <span>📅 Due: <strong style="color: #e2e8f0;">${escapeHtml(t.due_date || 'Pending')}</strong></span>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `<div style="color: #94a3b8; font-style: italic;">No action items extracted for this meeting session.</div>`;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            insightsFormattedReportHtml.innerHTML = html;
         }
 
         lucide.createIcons();
