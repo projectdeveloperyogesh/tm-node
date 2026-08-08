@@ -106,6 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupJobsEvents();
         setupAiLogsEvents();
         initCanvasWaveform();
+        loadAiLogs();
     }
 
     // --- Navigation Tabs ---
@@ -119,6 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabBtn) tabBtn.classList.add('active');
         if (tabContent) tabContent.classList.add('active');
         state.activeTab = tabName;
+        if (tabName === 'aiLogsTab') {
+            loadAiLogs();
+        }
         lucide.createIcons();
     }
 
