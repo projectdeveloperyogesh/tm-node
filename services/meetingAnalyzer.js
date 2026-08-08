@@ -402,7 +402,7 @@ class MeetingAnalyzer {
                     const parsed = JSON.parse(cleanJson.trim());
                     const enriched = this._enrichAnalysisOutput(parsed);
                     enriched.transcript = parsed.transcript || transcriptText || `Audio recording analyzed for ${meetingTitle}.`;
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success");
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
                     return enriched;
                 } catch (parseErr) {
                     const fallbackRes = {
@@ -421,7 +421,7 @@ class MeetingAnalyzer {
                         }],
                         transcript: transcriptText || reply
                     };
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback");
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
                     return fallbackRes;
                 }
             }

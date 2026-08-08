@@ -3,6 +3,10 @@ import re
 import json
 import uuid
 import requests
+import datetime
+import time
+
+AI_LOGS_FILE = os.path.join(os.path.dirname(__file__), "data", "ai_logs.json")
 
 class MeetingAnalyzer:
     def __init__(self, api_key=None, groq_api_key=None, openai_api_key=None, ollama_host=None, default_provider="auto"):
@@ -11,6 +15,50 @@ class MeetingAnalyzer:
         self.openai_api_key = openai_api_key
         self.ollama_host = ollama_host or "http://localhost:11434"
         self.default_provider = default_provider
+
+    def _record_ai_log(self, provider, meeting_title, target_language, prompt, response_raw, parsed_output, duration_ms, status="success", endpoint=None, http_method="POST", payload_dict=None):
+        try:
+            os.makedirs(os.path.dirname(AI_LOGS_FILE), exist_ok=True)
+            logs = []
+            if os.path.exists(AI_LOGS_FILE):
+                try:
+                    with open(AI_LOGS_FILE, "r", encoding="utf-8") as f:
+                        logs = json.load(f)
+                except Exception:
+                    logs = []
+            
+            resolved_endpoint = endpoint or ("http://localhost:3005/api/v1/ai/chat" if "3005" in str(provider) else "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+            
+            # Construct cURL command
+            if payload_dict:
+                json_payload_str = json.dumps(payload_dict, indent=2, ensure_ascii=False)
+            else:
+                json_payload_str = json.dumps({"prompt": prompt, "model": "Gemini 3.6 Flash (High)"}, indent=2, ensure_ascii=False)
+
+            curl_cmd = f'curl -X {http_method} "{resolved_endpoint}" \\\n  -H "Content-Type: application/json" \\\n  -d \'{json_payload_str}\''
+
+            entry = {
+                "id": "log_" + str(uuid.uuid4())[:8],
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "provider": provider,
+                "endpoint": resolved_endpoint,
+                "http_method": http_method,
+                "meeting_title": meeting_title,
+                "target_language": target_language,
+                "prompt": prompt,
+                "response_raw": response_raw,
+                "parsed_output": parsed_output,
+                "duration_ms": duration_ms,
+                "status": status,
+                "curl_command": curl_cmd
+            }
+            logs.insert(0, entry)
+            # Keep last 100 logs
+            logs = logs[:100]
+            with open(AI_LOGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(logs, f, indent=2, ensure_ascii=False)
+        except Exception as err:
+            print(f"Error saving AI log: {err}")
 
     def analyze_meeting(self, transcript_text, meeting_title="Meeting Recording", target_language="English", provider=None):
         """
@@ -26,6 +74,10 @@ class MeetingAnalyzer:
         selected_provider = (provider or self.default_provider or "auto").lower()
 
         # Direct Provider Routing
+        if selected_provider in ["yogesh_chat", "yogesh", "chat3005"]:
+            res = self._analyze_yogesh_chat(transcript_text, meeting_title, target_language)
+            if res: return res
+
         if selected_provider == "groq" and self.groq_api_key:
             res = self._analyze_groq(transcript_text, meeting_title, target_language)
             if res: return res
@@ -45,7 +97,10 @@ class MeetingAnalyzer:
         if selected_provider == "local":
             return self._local_nlp_analysis(transcript_text, meeting_title, target_language=target_language)
 
-        # Auto Provider Resolution Strategy: Gemini -> Groq -> OpenAI -> Ollama -> Local NLP
+        # Auto Provider Resolution Strategy: Yogesh Chat API (Port 3005) -> Gemini -> Groq -> OpenAI -> Ollama -> Local NLP
+        res_yc = self._analyze_yogesh_chat(transcript_text, meeting_title, target_language)
+        if res_yc: return res_yc
+
         if self.api_key:
             res = self._analyze_gemini(transcript_text, meeting_title, target_language)
             if res: return res
@@ -471,6 +526,60 @@ class MeetingAnalyzer:
             "items_discussed": items_discussed,
             "tasks": tasks
         }
+
+    def _analyze_yogesh_chat(self, transcript_text, meeting_title, target_language):
+        """
+        Integrates Yogesh Chat REST API running on http://localhost:3005/api/v1/ai/chat
+        """
+        t0 = time.time()
+        try:
+            url = "http://localhost:3005/api/v1/ai/chat"
+            prompt = self._get_analysis_prompt(transcript_text, target_language) + f"\n\nMeeting Title: {meeting_title}\n\nTranscript:\n{transcript_text}"
+            
+            payload = {
+                "prompt": prompt,
+                "model": "Gemini 3.6 Flash (High)"
+            }
+            
+            response = requests.post(url, json=payload, timeout=25)
+            duration_ms = int((time.time() - t0) * 1000)
+
+            if response.status_code == 200:
+                data = response.json()
+                reply_text = data.get("reply", "")
+                
+                clean_json_str = reply_text.strip()
+                if "```" in clean_json_str:
+                    clean_json_str = re.sub(r'^```(?:json)?\s*', '', clean_json_str, flags=re.MULTILINE)
+                    clean_json_str = re.sub(r'\s*```$', '', clean_json_str, flags=re.MULTILINE)
+                
+                try:
+                    parsed = json.loads(clean_json_str.strip())
+                    enriched = self._enrich_analysis_output(parsed, meeting_title, target_language)
+                    self._record_ai_log("Yogesh Chat (Port 3005)", meeting_title, target_language, prompt, reply_text, enriched, duration_ms, "success", endpoint=url, http_method="POST", payload_dict=payload)
+                    return enriched
+                except Exception as json_err:
+                    print(f"JSON Parse Error in Yogesh Chat response: {json_err}")
+                    fallback_res = {
+                        "summary": reply_text[:500],
+                        "items_discussed": [{"topic": "Meeting Notes", "details": reply_text, "category": "AI Output"}],
+                        "tasks": [{
+                            "id": str(uuid.uuid4())[:8],
+                            "title": f"Follow-up on {meeting_title}",
+                            "description": "Review generated meeting notes.",
+                            "assignee": "Team",
+                            "priority": "Medium",
+                            "category": "Follow-up",
+                            "due_date": "Tomorrow",
+                            "status": "todo",
+                            "subtasks": []
+                        }]
+                    }
+                    self._record_ai_log("Yogesh Chat (Port 3005)", meeting_title, target_language, prompt, reply_text, fallback_res, duration_ms, "partial_json_fallback", endpoint=url, http_method="POST", payload_dict=payload)
+                    return fallback_res
+        except Exception as e:
+            print(f"Yogesh Chat API (Port 3005) error: {e}")
+        return None
 
     def _empty_analysis(self):
         return {
