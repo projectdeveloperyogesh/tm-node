@@ -1084,6 +1084,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 copyToClipboard(fullReport, 'Full Session Intelligence copied to clipboard!');
             });
         }
+
+        const copyInsightsPromptBtn = document.getElementById('copyInsightsPromptBtn');
+        if (copyInsightsPromptBtn) {
+            copyInsightsPromptBtn.addEventListener('click', () => {
+                const txt = document.getElementById('insightsPromptText').value;
+                copyToClipboard(txt, 'AI Chat Prompt Payload copied to clipboard!');
+            });
+        }
+
+        const copyInsightsCurlBtn = document.getElementById('copyInsightsCurlBtn');
+        if (copyInsightsCurlBtn) {
+            copyInsightsCurlBtn.addEventListener('click', () => {
+                const txt = document.getElementById('insightsCurlText').value;
+                copyToClipboard(txt, 'Executable cURL Command copied to clipboard!');
+            });
+        }
+
+        const copyInsightsRawResponseBtn = document.getElementById('copyInsightsRawResponseBtn');
+        if (copyInsightsRawResponseBtn) {
+            copyInsightsRawResponseBtn.addEventListener('click', () => {
+                const txt = document.getElementById('insightsRawResponseText').value;
+                copyToClipboard(txt, 'Decoded Raw AI Response Payload copied to clipboard!');
+            });
+        }
     }
 
     function copyToClipboard(text, successMsg) {
@@ -1223,6 +1247,47 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 transcriptContainer.innerHTML = '<p class="empty-state">No transcript data.</p>';
             }
+        }
+
+        // AI Prompt Payload, cURL Command & Decoded Raw AI Response
+        const insightsPromptText = document.getElementById('insightsPromptText');
+        const insightsCurlText = document.getElementById('insightsCurlText');
+        const insightsRawResponseText = document.getElementById('insightsRawResponseText');
+
+        if (insightsPromptText) {
+            insightsPromptText.value = meeting.prompt || `Analyze the following meeting transcript for '${meeting.title}':\n\n${meeting.transcript || 'No transcript text available.'}`;
+        }
+
+        if (insightsCurlText) {
+            let curlStr = meeting.curl_command;
+            if (!curlStr) {
+                const payload = {
+                    prompt: meeting.prompt || `Analyze the following meeting transcript for '${meeting.title}':\n\n${meeting.transcript || ''}`,
+                    model: 'Gemini 3.6 Flash (High)'
+                };
+                curlStr = `curl -X POST "http://localhost:3005/api/v1/ai/chat" \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload, null, 2)}'`;
+            }
+            insightsCurlText.value = curlStr;
+        }
+
+        if (insightsRawResponseText) {
+            let rawStr = meeting.response_raw || '';
+            if (!rawStr) {
+                rawStr = JSON.stringify({
+                    summary: meeting.summary,
+                    items_discussed: meeting.items_discussed || [],
+                    tasks: meetingTasks.map(t => ({
+                        title: t.title,
+                        description: t.description,
+                        assignee: t.assignee,
+                        priority: t.priority,
+                        category: t.category,
+                        due_date: t.due_date,
+                        subtasks: t.subtasks || []
+                    }))
+                }, null, 2);
+            }
+            insightsRawResponseText.value = rawStr;
         }
 
         lucide.createIcons();

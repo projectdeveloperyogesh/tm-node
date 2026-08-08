@@ -398,10 +398,16 @@ class MeetingAnalyzer {
                     cleanJson = cleanJson.replace(/^```(?:json)?\s*/gm, '').replace(/\s*```$/gm, '');
                 }
 
+                const jsonPayloadStr = JSON.stringify(payload, null, 2);
+                const curlCmd = `curl -X POST "http://localhost:3005/api/v1/ai/chat" \\\n  -H "Content-Type: application/json" \\\n  -d '${jsonPayloadStr}'`;
+
                 try {
                     const parsed = JSON.parse(cleanJson.trim());
                     const enriched = this._enrichAnalysisOutput(parsed);
                     enriched.transcript = parsed.transcript || transcriptText || `Audio recording analyzed for ${meetingTitle}.`;
+                    enriched.prompt = prompt;
+                    enriched.curl_command = curlCmd;
+                    enriched.response_raw = reply;
                     this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
                     return enriched;
                 } catch (parseErr) {
@@ -419,7 +425,10 @@ class MeetingAnalyzer {
                             status: "todo",
                             subtasks: []
                         }],
-                        transcript: transcriptText || reply
+                        transcript: transcriptText || reply,
+                        prompt: prompt,
+                        curl_command: curlCmd,
+                        response_raw: reply
                     };
                     this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
                     return fallbackRes;

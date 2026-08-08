@@ -308,6 +308,42 @@
                                 <p class="empty-state">No action items extracted for this session.</p>
                             </div>
                         </div>
+
+                        <!-- NEW: AI Chat Prompt Received Card -->
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="send" class="accent-icon"></i> AI Engine Chat Prompt Payload</h2>
+                                <button id="copyInsightsPromptBtn" class="btn btn-secondary btn-xs" title="Copy Prompt Payload"><i data-lucide="copy"></i> Copy Prompt</button>
+                            </div>
+                            <div class="form-group margin-top-10">
+                                <textarea id="insightsPromptText" class="custom-input" style="height: 140px; font-family: monospace; font-size: 0.83rem; background: rgba(15, 23, 42, 0.8); color: #cbd5e1; white-space: pre-wrap;" readonly placeholder="AI chat prompt payload sent to AI engine will appear here..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Executable cURL Command Card -->
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="terminal" class="accent-icon"></i> Executable cURL Request Command</h2>
+                                <button id="copyInsightsCurlBtn" class="btn btn-secondary btn-xs" title="Copy cURL Command"><i data-lucide="copy"></i> Copy cURL</button>
+                            </div>
+                            <div class="form-group margin-top-10">
+                                <textarea id="insightsCurlText" class="custom-input" style="height: 110px; font-family: monospace; font-size: 0.82rem; background: rgba(15, 23, 42, 0.8); color: #a7f3d0; white-space: pre-wrap;" readonly placeholder="Executable cURL command will appear here..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Decoded Raw AI Response & JSON Schema Inspector -->
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="code-2" class="accent-icon"></i> Decoded Raw AI Response Payload (JSON Schema)</h2>
+                                <div class="flex-align-center gap-10">
+                                    <button id="copyInsightsRawResponseBtn" class="btn btn-secondary btn-xs" title="Copy Raw Response Output"><i data-lucide="copy"></i> Copy Raw JSON</button>
+                                    <span class="badge badge-success" id="insightsJsonBadge">Decoded JSON</span>
+                                </div>
+                            </div>
+                            <div class="form-group margin-top-10">
+                                <textarea id="insightsRawResponseText" class="custom-input" style="height: 200px; font-family: monospace; font-size: 0.83rem; background: rgba(15, 23, 42, 0.8); color: #38bdf8; white-space: pre-wrap;" readonly placeholder="Raw AI response payload received from Yogesh Chat (Port 3005) or Gemini will appear here..."></textarea>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Right: Transcript & Audio Player -->
@@ -649,7 +685,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/static/app.js?v=1.0.8"></script>
+    <script src="/static/app.js?v=1.0.9"></script>
     <script>
         lucide.createIcons();
     </script>

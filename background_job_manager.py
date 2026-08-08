@@ -134,7 +134,10 @@ def process_background_meeting(
             "segments": segments,
             "summary": analysis.get("summary", f"Meeting session '{meeting_title}' recorded."),
             "items_discussed": analysis.get("items_discussed", []),
-            "task_count": len(analysis.get("tasks", []))
+            "task_count": len(analysis.get("tasks", [])),
+            "prompt": analysis.get("prompt", ""),
+            "curl_command": analysis.get("curl_command", ""),
+            "response_raw": analysis.get("response_raw", "")
         }
 
         # Save to meetings store

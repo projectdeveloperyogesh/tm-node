@@ -341,7 +341,10 @@ app.post('/api/record/stop_web', uploadRecordings.single('file'), async (req, re
             segments: [{ start: "00:00", end: "End", speaker: "Speaker", text: transcriptText }],
             summary: analysis.summary,
             items_discussed: analysis.items_discussed,
-            task_count: analysis.tasks.length
+            task_count: analysis.tasks.length,
+            prompt: analysis.prompt || "",
+            curl_command: analysis.curl_command || "",
+            response_raw: analysis.response_raw || ""
         };
 
         const meetings = loadJson(MEETINGS_FILE, []);
