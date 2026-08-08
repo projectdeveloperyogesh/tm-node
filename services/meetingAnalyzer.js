@@ -3,8 +3,13 @@ const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class MeetingAnalyzer {
-    constructor(apiKey = null) {
+    constructor(apiKey = null, groqApiKey = null, openaiApiKey = null, ollamaHost = null, yogeshChatHost = null, defaultProvider = "auto") {
         this.apiKey = apiKey;
+        this.groqApiKey = groqApiKey;
+        this.openaiApiKey = openaiApiKey;
+        this.ollamaHost = ollamaHost || "http://localhost:11434";
+        this.yogeshChatHost = yogeshChatHost || "http://localhost:3005/api/v1/ai/chat";
+        this.defaultProvider = defaultProvider;
     }
 
     async analyzeAudioFile(audioFilePath, meetingTitle = "Meeting Recording", targetLanguage = "English") {
@@ -383,7 +388,19 @@ class MeetingAnalyzer {
                 files: fileObjs
             };
 
-            const chatRes = await fetch('http://localhost:3005/api/v1/ai/chat', {
+            let targetUrl = this.yogeshChatHost || "http://localhost:3005/api/v1/ai/chat";
+            if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                targetUrl = `http://${targetUrl}`;
+            }
+            if (!targetUrl.endsWith('/api/v1/ai/chat') && !targetUrl.endsWith('/chat')) {
+                if (targetUrl.endsWith('/')) {
+                    targetUrl += 'api/v1/ai/chat';
+                } else {
+                    targetUrl += '/api/v1/ai/chat';
+                }
+            }
+
+            const chatRes = await fetch(targetUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -399,7 +416,7 @@ class MeetingAnalyzer {
                 }
 
                 const jsonPayloadStr = JSON.stringify(payload, null, 2);
-                const curlCmd = `curl -X POST "http://localhost:3005/api/v1/ai/chat" \\\n  -H "Content-Type: application/json" \\\n  -d '${jsonPayloadStr}'`;
+                const curlCmd = `curl -X POST "${targetUrl}" \\\n  -H "Content-Type: application/json" \\\n  -d '${jsonPayloadStr}'`;
 
                 try {
                     const parsed = JSON.parse(cleanJson.trim());
@@ -408,7 +425,7 @@ class MeetingAnalyzer {
                     enriched.prompt = prompt;
                     enriched.curl_command = curlCmd;
                     enriched.response_raw = reply;
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", targetUrl, "POST", payload);
                     return enriched;
                 } catch (parseErr) {
                     const fallbackRes = {
@@ -430,7 +447,7 @@ class MeetingAnalyzer {
                         curl_command: curlCmd,
                         response_raw: reply
                     };
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback", "http://localhost:3005/api/v1/ai/chat", "POST", payload);
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback", targetUrl, "POST", payload);
                     return fallbackRes;
                 }
             }

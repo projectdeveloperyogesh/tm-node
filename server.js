@@ -141,6 +141,18 @@ function getGeminiApiKey() {
     return settings.gemini_api_key || process.env.GEMINI_API_KEY || null;
 }
 
+function getAnalyzer() {
+    const settings = loadJson(SETTINGS_FILE, {});
+    return new MeetingAnalyzer(
+        settings.gemini_api_key || process.env.GEMINI_API_KEY || null,
+        settings.groq_api_key || process.env.GROQ_API_KEY || null,
+        settings.openai_api_key || process.env.OPENAI_API_KEY || null,
+        settings.ollama_host || "http://localhost:11434",
+        settings.yogesh_chat_host || "http://localhost:3005/api/v1/ai/chat",
+        settings.ai_provider || "auto"
+    );
+}
+
 // HTTP Helper for Audio Bridge
 function proxyToBridge(method, endpoint, postData = null, timeoutMs = 60000) {
     return new Promise((resolve, reject) => {
@@ -383,7 +395,7 @@ app.post('/api/upload', uploadMedia.single('file'), async (req, res) => {
 
         const processedWav = await mediaProcessor.processMediaFile(file.path);
         const apiKey = getGeminiApiKey();
-        const analyzer = new MeetingAnalyzer(apiKey);
+        const analyzer = getAnalyzer();
         const speechService = new SpeechService(apiKey);
 
         let analysis = await analyzer.analyzeAudioFile(processedWav, meetingTitle, targetLanguage);
@@ -456,8 +468,7 @@ app.post('/api/meetings/:id/reanalyze', async (req, res) => {
     }
 
     const meeting = meetings[mIdx];
-    const apiKey = getGeminiApiKey();
-    const analyzer = new MeetingAnalyzer(apiKey);
+    const analyzer = getAnalyzer();
     const analysis = await analyzer.analyzeMeeting(meeting.transcript || "", meeting.title, targetLanguage);
 
     meeting.summary = analysis.summary;
@@ -609,13 +620,14 @@ app.get('/api/settings', (req, res) => {
         gemini_api_key: settings.gemini_api_key || "",
         groq_api_key: settings.groq_api_key || "",
         openai_api_key: settings.openai_api_key || "",
-        ollama_host: settings.ollama_host || "http://localhost:11434"
+        ollama_host: settings.ollama_host || "http://localhost:11434",
+        yogesh_chat_host: settings.yogesh_chat_host || "http://localhost:3005/api/v1/ai/chat"
     });
 });
 
 app.post('/api/settings', (req, res) => {
     const settings = loadJson(SETTINGS_FILE, {});
-    ["ai_provider", "gemini_api_key", "groq_api_key", "openai_api_key", "ollama_host"].forEach(k => {
+    ["ai_provider", "gemini_api_key", "groq_api_key", "openai_api_key", "ollama_host", "yogesh_chat_host"].forEach(k => {
         if (req.body[k] !== undefined) {
             settings[k] = req.body[k];
         }

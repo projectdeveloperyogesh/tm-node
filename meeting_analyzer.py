@@ -9,11 +9,12 @@ import time
 AI_LOGS_FILE = os.path.join(os.path.dirname(__file__), "data", "ai_logs.json")
 
 class MeetingAnalyzer:
-    def __init__(self, api_key=None, groq_api_key=None, openai_api_key=None, ollama_host=None, default_provider="auto"):
+    def __init__(self, api_key=None, groq_api_key=None, openai_api_key=None, ollama_host=None, yogesh_chat_host=None, default_provider="auto"):
         self.api_key = api_key
         self.groq_api_key = groq_api_key
         self.openai_api_key = openai_api_key
         self.ollama_host = ollama_host or "http://localhost:11434"
+        self.yogesh_chat_host = yogesh_chat_host or "http://localhost:3005/api/v1/ai/chat"
         self.default_provider = default_provider
 
     def _record_ai_log(self, provider, meeting_title, target_language, prompt, response_raw, parsed_output, duration_ms, status="success", endpoint=None, http_method="POST", payload_dict=None):
@@ -529,11 +530,19 @@ class MeetingAnalyzer:
 
     def _analyze_yogesh_chat(self, transcript_text, meeting_title, target_language):
         """
-        Integrates Yogesh Chat REST API running on http://localhost:3005/api/v1/ai/chat
+        Integrates Yogesh Chat REST API with dynamic endpoint URL configuration
         """
         t0 = time.time()
         try:
-            url = "http://localhost:3005/api/v1/ai/chat"
+            url = self.yogesh_chat_host or "http://localhost:3005/api/v1/ai/chat"
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = f"http://{url}"
+            if not url.endswith("/api/v1/ai/chat") and not url.endswith("/chat"):
+                if url.endswith("/"):
+                    url += "api/v1/ai/chat"
+                else:
+                    url += "/api/v1/ai/chat"
+
             prompt = self._get_analysis_prompt(transcript_text, target_language) + f"\n\nMeeting Title: {meeting_title}\n\nTranscript:\n{transcript_text}"
             
             payload = {
@@ -553,9 +562,15 @@ class MeetingAnalyzer:
                     clean_json_str = re.sub(r'^```(?:json)?\s*', '', clean_json_str, flags=re.MULTILINE)
                     clean_json_str = re.sub(r'\s*```$', '', clean_json_str, flags=re.MULTILINE)
                 
+                json_payload_str = json.dumps(payload, indent=2, ensure_ascii=False)
+                curl_cmd = f'curl -X POST "{url}" \\\n  -H "Content-Type: application/json" \\\n  -d \'{json_payload_str}\''
+
                 try:
                     parsed = json.loads(clean_json_str.strip())
                     enriched = self._enrich_analysis_output(parsed, meeting_title, target_language)
+                    enriched["prompt"] = prompt
+                    enriched["curl_command"] = curl_cmd
+                    enriched["response_raw"] = reply_text
                     self._record_ai_log("Yogesh Chat (Port 3005)", meeting_title, target_language, prompt, reply_text, enriched, duration_ms, "success", endpoint=url, http_method="POST", payload_dict=payload)
                     return enriched
                 except Exception as json_err:
@@ -573,7 +588,10 @@ class MeetingAnalyzer:
                             "due_date": "Tomorrow",
                             "status": "todo",
                             "subtasks": []
-                        }]
+                        }],
+                        "prompt": prompt,
+                        "curl_command": curl_cmd,
+                        "response_raw": reply_text
                     }
                     self._record_ai_log("Yogesh Chat (Port 3005)", meeting_title, target_language, prompt, reply_text, fallback_res, duration_ms, "partial_json_fallback", endpoint=url, http_method="POST", payload_dict=payload)
                     return fallback_res

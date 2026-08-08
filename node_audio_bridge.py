@@ -124,13 +124,23 @@ def stop_recording(meeting_title: str = Form("Live Recorded Meeting"), target_la
         meetings_file = os.path.join(data_dir, "meetings.json")
         tasks_file = os.path.join(data_dir, "tasks.json")
 
+        def _get_configured_analyzer():
+            settings = _load_json(os.path.join(data_dir, "settings.json"), {})
+            g_key = settings.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
+            gr_key = settings.get("groq_api_key") or os.environ.get("GROQ_API_KEY")
+            o_key = settings.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
+            ol_host = settings.get("ollama_host") or os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+            yc_host = settings.get("yogesh_chat_host") or os.environ.get("YOGESH_CHAT_HOST") or "http://localhost:3005/api/v1/ai/chat"
+            prov = settings.get("ai_provider", "auto")
+            return MeetingAnalyzer(api_key=g_key, groq_api_key=gr_key, openai_api_key=o_key, ollama_host=ol_host, yogesh_chat_host=yc_host, default_provider=prov)
+
         job = dispatch_background_meeting(
             filepath=wav_path,
             meeting_title=meeting_title,
             target_language=target_language,
             live_trans=live_trans,
             speech_engine=speech_engine,
-            get_analyzer_func=lambda: MeetingAnalyzer(),
+            get_analyzer_func=_get_configured_analyzer,
             load_json_func=_load_json,
             save_json_func=_save_json,
             meetings_file=meetings_file,

@@ -1760,6 +1760,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const groqKey = document.getElementById('groqApiKeyInput').value.trim();
             const openaiKey = document.getElementById('openaiApiKeyInput').value.trim();
             const ollamaHost = document.getElementById('ollamaHostInput').value.trim();
+            const yogeshChatHost = document.getElementById('yogeshChatHostInput').value.trim();
 
             await fetch('/api/settings', {
                 method: 'POST',
@@ -1769,7 +1770,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     gemini_api_key: geminiKey,
                     groq_api_key: groqKey,
                     openai_api_key: openaiKey,
-                    ollama_host: ollamaHost
+                    ollama_host: ollamaHost,
+                    yogesh_chat_host: yogeshChatHost
                 })
             });
             settingsModal.classList.add('hidden');
@@ -1800,6 +1802,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.ollama_host) {
                 const olInput = document.getElementById('ollamaHostInput');
                 if (olInput) olInput.value = data.ollama_host;
+            }
+            if (data.yogesh_chat_host) {
+                const ycInput = document.getElementById('yogeshChatHostInput');
+                if (ycInput) ycInput.value = data.yogesh_chat_host;
             }
         } catch (e) {
             console.error(e);
