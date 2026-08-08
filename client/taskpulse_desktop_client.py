@@ -3,15 +3,18 @@ import sys
 import time
 import wave
 import threading
-import numpy as np
-import requests
 import tkinter as tk
 from tkinter import ttk, messagebox
 
 try:
+    import numpy as np
+    import requests
     import sounddevice as sd
 except ImportError:
-    os.system("pip install sounddevice numpy requests")
+    print("Installing missing dependencies: sounddevice, numpy, requests...")
+    os.system(f'"{sys.executable}" -m pip install sounddevice numpy requests')
+    import numpy as np
+    import requests
     import sounddevice as sd
 
 class TaskPulseDesktopClient:
