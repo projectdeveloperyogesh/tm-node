@@ -596,7 +596,7 @@
 
     <!-- AI Log Payload Detail Inspection Modal -->
     <div class="modal-overlay hidden" id="aiLogDetailModal">
-        <div class="modal-card" style="max-width: 850px; width: 90%;">
+        <div class="modal-card" style="max-width: 850px; width: 90%; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header flex-between">
                 <h3><i data-lucide="file-code" class="accent-icon"></i> AI Request & Response Payload Inspector</h3>
                 <button class="icon-btn" id="closeAiLogDetailModalBtn"><i data-lucide="x"></i></button>
@@ -609,12 +609,28 @@
                 <div class="help-text" id="logModalMetaText">Timestamp • Latency</div>
             </div>
 
+            <div class="form-group margin-top-10">
+                <label><i data-lucide="link"></i> Target API Endpoint URL</label>
+                <div class="flex-align-center gap-10">
+                    <span class="badge badge-success" id="logModalMethodBadge" style="font-family: monospace; font-size: 0.85rem;">POST</span>
+                    <input type="text" id="logModalEndpointInput" class="custom-input flex-grow-1" style="font-family: monospace; font-size: 0.85rem; color: #38bdf8;" readonly>
+                </div>
+            </div>
+
+            <div class="form-group margin-top-15">
+                <div class="flex-between margin-bottom-5">
+                    <label><i data-lucide="terminal"></i> Executable cURL Shell Command (1-Click Copy)</label>
+                    <button type="button" class="btn btn-secondary btn-xs" id="copyAiCurlBtn"><i data-lucide="copy"></i> Copy cURL Command</button>
+                </div>
+                <textarea id="logModalCurlTextarea" class="custom-input" style="height: 120px; font-family: monospace; font-size: 0.82rem; background: rgba(15, 23, 42, 0.9); color: #a7f3d0; white-space: pre-wrap;" readonly></textarea>
+            </div>
+
             <div class="form-group margin-top-15">
                 <div class="flex-between margin-bottom-5">
                     <label><i data-lucide="send"></i> Full Prompt Sent to AI Engine</label>
                     <button type="button" class="btn btn-secondary btn-xs" id="copyAiPromptBtn"><i data-lucide="copy"></i> Copy Prompt</button>
                 </div>
-                <textarea id="logModalPromptTextarea" class="custom-input" style="height: 180px; font-family: monospace; font-size: 0.85rem; background: rgba(15, 23, 42, 0.9); color: #cbd5e1; white-space: pre-wrap;" readonly></textarea>
+                <textarea id="logModalPromptTextarea" class="custom-input" style="height: 160px; font-family: monospace; font-size: 0.85rem; background: rgba(15, 23, 42, 0.9); color: #cbd5e1; white-space: pre-wrap;" readonly></textarea>
             </div>
 
             <div class="form-group margin-top-15">
@@ -622,7 +638,7 @@
                     <label><i data-lucide="message-square-code"></i> Full Raw Response Output Received from AI Engine</label>
                     <button type="button" class="btn btn-secondary btn-xs" id="copyAiResponseBtn"><i data-lucide="copy"></i> Copy Response</button>
                 </div>
-                <textarea id="logModalResponseTextarea" class="custom-input" style="height: 220px; font-family: monospace; font-size: 0.85rem; background: rgba(15, 23, 42, 0.9); color: #38bdf8; white-space: pre-wrap;" readonly></textarea>
+                <textarea id="logModalResponseTextarea" class="custom-input" style="height: 180px; font-family: monospace; font-size: 0.85rem; background: rgba(15, 23, 42, 0.9); color: #38bdf8; white-space: pre-wrap;" readonly></textarea>
             </div>
 
             <div class="modal-footer margin-top-20 flex-between">

@@ -1745,6 +1745,15 @@ document.addEventListener('DOMContentLoaded', () => {
             closeAiLogDetailFooterBtn.addEventListener('click', () => aiLogDetailModal.classList.add('hidden'));
         }
 
+        const copyAiCurlBtn = document.getElementById('copyAiCurlBtn');
+        if (copyAiCurlBtn) {
+            copyAiCurlBtn.addEventListener('click', () => {
+                const txt = document.getElementById('logModalCurlTextarea').value;
+                navigator.clipboard.writeText(txt);
+                alert('Copied executable cURL command to clipboard!');
+            });
+        }
+
         const copyAiPromptBtn = document.getElementById('copyAiPromptBtn');
         if (copyAiPromptBtn) {
             copyAiPromptBtn.addEventListener('click', () => {
@@ -1785,6 +1794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!filterQuery) return true;
             return (log.provider || '').toLowerCase().includes(filterQuery) ||
                    (log.meeting_title || '').toLowerCase().includes(filterQuery) ||
+                   (log.endpoint || '').toLowerCase().includes(filterQuery) ||
                    (log.prompt || '').toLowerCase().includes(filterQuery);
         });
 
@@ -1799,17 +1809,18 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const badgeClass = log.status === 'success' ? 'badge-success' : 'badge-category';
             const latencyStr = log.duration_ms ? `${log.duration_ms} ms` : 'N/A';
+            const endpointStr = log.endpoint || 'http://localhost:3005/api/v1/ai/chat';
 
             tr.innerHTML = `
                 <td style="padding: 12px; font-size: 0.85rem; color: #cbd5e1; font-family: monospace;">${escapeHtml(log.timestamp || '')}</td>
                 <td style="padding: 12px;"><span class="badge badge-primary"><i data-lucide="cpu" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> ${escapeHtml(log.provider || 'AI Engine')}</span></td>
+                <td style="padding: 12px; font-size: 0.82rem; color: #38bdf8; font-family: monospace;">${escapeHtml(endpointStr)}</td>
                 <td style="padding: 12px; font-weight: 600; color: #f8fafc;">${escapeHtml(log.meeting_title || 'Session')}</td>
-                <td style="padding: 12px; font-size: 0.85rem; color: #94a3b8;">${escapeHtml(log.target_language || 'English')}</td>
                 <td style="padding: 12px; font-size: 0.85rem; color: #cbd5e1; font-family: monospace;">${latencyStr}</td>
                 <td style="padding: 12px;"><span class="badge ${badgeClass}">${escapeHtml(log.status || 'OK')}</span></td>
                 <td style="padding: 12px; text-align: right;">
                     <button class="btn btn-secondary btn-xs view-log-payload-btn" data-id="${log.id}">
-                        <i data-lucide="eye"></i> Inspect Prompt & Reply
+                        <i data-lucide="eye"></i> Inspect Prompt & cURL
                     </button>
                 </td>
             `;
@@ -1829,9 +1840,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('aiLogDetailModal');
         if (!modal) return;
 
+        const endpoint = log.endpoint || 'http://localhost:3005/api/v1/ai/chat';
+        const httpMethod = log.http_method || 'POST';
+
         document.getElementById('logModalProviderBadge').textContent = log.provider || 'AI Engine';
         document.getElementById('logModalTitleText').textContent = log.meeting_title || 'Meeting Session';
         document.getElementById('logModalMetaText').textContent = `${log.timestamp || ''} • ${log.duration_ms ? log.duration_ms + 'ms' : ''} • ${log.target_language || 'English'}`;
+
+        document.getElementById('logModalMethodBadge').textContent = httpMethod;
+        document.getElementById('logModalEndpointInput').value = endpoint;
+
+        let curlCmd = log.curl_command;
+        if (!curlCmd) {
+            const payload = { prompt: log.prompt || '', model: 'Gemini 3.6 Flash (High)' };
+            curlCmd = `curl -X ${httpMethod} "${endpoint}" \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload, null, 2)}'`;
+        }
+        document.getElementById('logModalCurlTextarea').value = curlCmd;
 
         document.getElementById('logModalPromptTextarea').value = log.prompt || 'No prompt payload available.';
         

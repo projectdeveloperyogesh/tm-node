@@ -431,7 +431,7 @@ class MeetingAnalyzer {
         return null;
     }
 
-    _recordAiLog(provider, meetingTitle, targetLanguage, prompt, responseRaw, parsedOutput, durationMs, status = "success") {
+    _recordAiLog(provider, meetingTitle, targetLanguage, prompt, responseRaw, parsedOutput, durationMs, status = "success", endpoint = null, httpMethod = "POST", payloadDict = null) {
         try {
             const dataDir = path.join(__dirname, '..', 'data');
             if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -440,17 +440,27 @@ class MeetingAnalyzer {
             if (fs.existsSync(logsFile)) {
                 try { logs = JSON.parse(fs.readFileSync(logsFile, 'utf8')); } catch (e) { logs = []; }
             }
+
+            const resolvedEndpoint = endpoint || ("http://localhost:3005/api/v1/ai/chat");
+            const payload = payloadDict || { prompt: prompt, model: "Gemini 3.6 Flash (High)" };
+            const jsonPayloadStr = JSON.stringify(payload, null, 2);
+
+            const curlCmd = `curl -X ${httpMethod} "${resolvedEndpoint}" \\\n  -H "Content-Type: application/json" \\\n  -d '${jsonPayloadStr}'`;
+
             const entry = {
                 id: "log_" + Math.random().toString(36).substring(2, 10),
                 timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
                 provider: provider,
+                endpoint: resolvedEndpoint,
+                http_method: httpMethod,
                 meeting_title: meetingTitle,
                 target_language: targetLanguage,
                 prompt: prompt,
                 response_raw: responseRaw,
                 parsed_output: parsedOutput,
                 duration_ms: durationMs,
-                status: status
+                status: status,
+                curl_command: curlCmd
             };
             logs.unshift(entry);
             fs.writeFileSync(logsFile, JSON.stringify(logs.slice(0, 100), null, 2), 'utf8');
