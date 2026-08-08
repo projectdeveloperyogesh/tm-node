@@ -455,6 +455,141 @@ app.post('/api/android/upload', uploadRecordings.single('file'), async (req, res
     }
 });
 
+// Helper for generic audio upload processing
+async function handleAudioUploadAndAnalysis(req, res, fileFolder = 'recordings') {
+    try {
+        const file = req.file;
+        const meetingTitle = req.body.meeting_title || req.body.title || "Recorded Meeting Session";
+        const targetLanguage = req.body.target_language || req.body.language || "English";
+        const liveTranscript = req.body.live_transcript || req.body.transcript || "";
+
+        if (!file) {
+            return res.status(400).json({ detail: "No audio/media file uploaded." });
+        }
+
+        console.log(`[Node.js Express Server] Processing uploaded recording '${file.filename}' for '${meetingTitle}'...`);
+
+        const processedWav = await mediaProcessor.processMediaFile(file.path);
+        const apiKey = getGeminiApiKey();
+        const analyzer = getAnalyzer();
+        const speechService = new SpeechService(apiKey);
+
+        let analysis = await analyzer.analyzeAudioFile(processedWav, meetingTitle, targetLanguage);
+        let transcriptText = liveTranscript.trim() || analysis.transcript;
+
+        if (!transcriptText || transcriptText.trim().length === 0) {
+            const transcribeRes = await speechService.transcribeAudio(processedWav);
+            transcriptText = transcribeRes.text;
+        }
+
+        const meetingId = Math.random().toString(36).substring(2, 10);
+        const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+        const meetingObj = {
+            id: meetingId,
+            title: meetingTitle,
+            language: targetLanguage,
+            created_at: createdAt,
+            audio_url: `/${fileFolder}/${file.filename}`,
+            audio_filename: file.filename,
+            transcript: transcriptText,
+            segments: [{ start: "00:00", end: "End", speaker: "Speaker", text: transcriptText }],
+            summary: analysis.summary,
+            items_discussed: analysis.items_discussed,
+            task_count: analysis.tasks.length,
+            prompt: analysis.prompt || "",
+            curl_command: analysis.curl_command || "",
+            response_raw: analysis.response_raw || ""
+        };
+
+        const meetings = loadJson(MEETINGS_FILE, []);
+        meetings.unshift(meetingObj);
+        saveJson(MEETINGS_FILE, meetings);
+
+        const existingTasks = loadJson(TASKS_FILE, []);
+        const newTasks = analysis.tasks.map(t => ({
+            ...t,
+            meeting_id: meetingId,
+            language: targetLanguage
+        }));
+        newTasks.forEach(t => existingTasks.unshift(t));
+        saveJson(TASKS_FILE, existingTasks);
+
+        console.log(`[Node.js Express Server] Meeting session '${meetingTitle}' processed successfully. ${newTasks.length} tasks generated.`);
+
+        res.json({
+            status: "success",
+            meeting: meetingObj,
+            tasks: newTasks
+        });
+    } catch (err) {
+        console.error(`[Node.js Express Server] Error in upload API: ${err.message}`);
+        res.status(500).json({ detail: err.message });
+    }
+}
+
+// Multiple Recording Upload APIs (Web, Mobile, External Apps)
+app.post('/api/record/upload', uploadRecordings.single('file'), (req, res) => handleAudioUploadAndAnalysis(req, res, 'recordings'));
+app.post('/api/recordings/upload', uploadRecordings.single('file'), (req, res) => handleAudioUploadAndAnalysis(req, res, 'recordings'));
+app.post('/api/audio/upload', uploadRecordings.single('file'), (req, res) => handleAudioUploadAndAnalysis(req, res, 'recordings'));
+
+// Direct Text / Transcript Analysis API
+app.post('/api/transcribe/text', async (req, res) => {
+    try {
+        const text = req.body.text || req.body.transcript || "";
+        const title = req.body.meeting_title || req.body.title || "Text Transcript Session";
+        const targetLanguage = req.body.target_language || req.body.language || "English";
+
+        if (!text.trim()) {
+            return res.status(400).json({ detail: "No transcript text provided." });
+        }
+
+        const analyzer = getAnalyzer();
+        const analysis = await analyzer.analyzeMeeting(text, title, targetLanguage);
+
+        const meetingId = Math.random().toString(36).substring(2, 10);
+        const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+        const meetingObj = {
+            id: meetingId,
+            title: title,
+            language: targetLanguage,
+            created_at: createdAt,
+            audio_url: "",
+            audio_filename: "",
+            transcript: text,
+            segments: [{ start: "00:00", end: "End", speaker: "Speaker", text: text }],
+            summary: analysis.summary,
+            items_discussed: analysis.items_discussed,
+            task_count: analysis.tasks.length,
+            prompt: analysis.prompt || "",
+            curl_command: analysis.curl_command || "",
+            response_raw: analysis.response_raw || ""
+        };
+
+        const meetings = loadJson(MEETINGS_FILE, []);
+        meetings.unshift(meetingObj);
+        saveJson(MEETINGS_FILE, meetings);
+
+        const existingTasks = loadJson(TASKS_FILE, []);
+        const newTasks = analysis.tasks.map(t => ({
+            ...t,
+            meeting_id: meetingId,
+            language: targetLanguage
+        }));
+        newTasks.forEach(t => existingTasks.unshift(t));
+        saveJson(TASKS_FILE, existingTasks);
+
+        res.json({
+            status: "success",
+            meeting: meetingObj,
+            tasks: newTasks
+        });
+    } catch (err) {
+        res.status(500).json({ detail: err.message });
+    }
+});
+
 // Upload Media Files (.wav, .mp3, .mp4, .webm)
 app.post('/api/upload', uploadMedia.single('file'), async (req, res) => {
     try {
