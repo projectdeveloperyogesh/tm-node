@@ -12,6 +12,10 @@ class MeetingAnalyzer {
             return this._emptyAnalysis(meetingTitle, targetLanguage);
         }
 
+        // Attempt 1: Yogesh Chat API (Port 3005)
+        const ycRes = await this._analyzeYogeshChat(null, meetingTitle, targetLanguage, audioFilePath);
+        if (ycRes) return ycRes;
+
         if (this.apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -310,6 +314,114 @@ class MeetingAnalyzer {
             items_discussed: itemsDiscussed,
             tasks: tasks
         };
+    }
+
+    async _analyzeYogeshChat(transcriptText, meetingTitle, targetLanguage, audioFilePath = null) {
+        try {
+            const prompt = `
+            Analyze the following meeting audio/transcript and extract structured meeting intelligence in ${targetLanguage}.
+            
+            Return ONLY a raw JSON object (no markdown, no backticks) with this exact schema:
+            {
+              "transcript": "Full transcript of what was discussed...",
+              "summary": "Executive summary paragraph in ${targetLanguage}...",
+              "items_discussed": [
+                {
+                  "topic": "Topic Title in ${targetLanguage}",
+                  "details": "Bullet point details in ${targetLanguage}",
+                  "category": "Technical | Decision | Follow-up | Discussion"
+                }
+              ],
+              "tasks": [
+                {
+                  "title": "Action Task Title in ${targetLanguage}",
+                  "description": "Task description in ${targetLanguage}",
+                  "assignee": "Assignee name or Team",
+                  "priority": "High | Medium | Low",
+                  "category": "Technical | Follow-up | Decision",
+                  "dueDate": "Tomorrow",
+                  "subtasks": ["Subtask 1"]
+                }
+              ]
+            }
+
+            Meeting Title: ${meetingTitle}
+            Transcript: ${transcriptText || "Analyze attached audio recording."}
+            `;
+
+            let fileObjs = [];
+            if (audioFilePath && fs.existsSync(audioFilePath)) {
+                try {
+                    const FormData = require('form-data');
+                    const form = new FormData();
+                    form.append('files', fs.createReadStream(audioFilePath));
+
+                    const upRes = await fetch('http://localhost:3005/api/v1/upload', {
+                        method: 'POST',
+                        body: form,
+                        headers: form.getHeaders ? form.getHeaders() : {}
+                    });
+
+                    if (upRes.ok) {
+                        const upData = await upRes.json();
+                        if (upData.files && upData.files.length > 0) {
+                            fileObjs = [upData.files[0]];
+                        }
+                    }
+                } catch (upErr) {
+                    console.warn("Upload to Port 3005 notice:", upErr.message);
+                }
+            }
+
+            const payload = {
+                prompt: prompt,
+                model: "Gemini 3.6 Flash (High)",
+                files: fileObjs
+            };
+
+            const chatRes = await fetch('http://localhost:3005/api/v1/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (chatRes.ok) {
+                const chatData = await chatRes.json();
+                let reply = chatData.reply || "";
+
+                let cleanJson = reply.trim();
+                if (cleanJson.includes("```")) {
+                    cleanJson = cleanJson.replace(/^```(?:json)?\s*/gm, '').replace(/\s*```$/gm, '');
+                }
+
+                try {
+                    const parsed = JSON.parse(cleanJson.trim());
+                    const enriched = this._enrichAnalysisOutput(parsed);
+                    enriched.transcript = parsed.transcript || transcriptText || `Audio recording analyzed for ${meetingTitle}.`;
+                    return enriched;
+                } catch (parseErr) {
+                    return {
+                        summary: reply.substring(0, 500),
+                        items_discussed: [{ topic: "Meeting Notes", details: reply, category: "AI Notes" }],
+                        tasks: [{
+                            id: Math.random().toString(36).substring(2, 10),
+                            title: `Follow-up on ${meetingTitle}`,
+                            description: "Review generated meeting notes.",
+                            assignee: "Team",
+                            priority: "Medium",
+                            category: "Follow-up",
+                            due_date: "Tomorrow",
+                            status: "todo",
+                            subtasks: []
+                        }],
+                        transcript: transcriptText || reply
+                    };
+                }
+            }
+        } catch (err) {
+            console.warn("Yogesh Chat API (Port 3005) notice:", err.message);
+        }
+        return null;
     }
 
     _emptyAnalysis(meetingTitle, targetLanguage) {
