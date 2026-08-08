@@ -440,102 +440,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         startRecordBtn.addEventListener('click', async () => {
-            const engine = engineSelect ? engineSelect.value : 'desktop';
+            const formData = new FormData();
+            formData.append('mic_id', micSelect.value || '');
+            formData.append('speaker_id', speakerSelect.value || '');
 
-            if (engine === 'web') {
-                try {
-                    await startWebBrowserRecording();
+            try {
+                const res = await fetch('/api/record/start', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.status === 'recording_started' || data.status === 'already_recording') {
+                    state.isRecording = true;
+                    state.isPaused = false;
+                    state.isMicMuted = false;
+                    state.isSpeakerMuted = false;
+
+                    if (muteMicBtn) {
+                        muteMicBtn.innerHTML = '<i data-lucide="mic"></i> Mic On';
+                        muteMicBtn.classList.remove('btn-danger');
+                        muteMicBtn.classList.add('btn-secondary');
+                    }
+                    if (muteSpeakerBtn) {
+                        muteSpeakerBtn.innerHTML = '<i data-lucide="volume-2"></i> Speaker On';
+                        muteSpeakerBtn.classList.remove('btn-danger');
+                        muteSpeakerBtn.classList.add('btn-secondary');
+                    }
+
                     startRecordBtn.disabled = true;
                     pauseRecordBtn.disabled = false;
                     stopRecordBtn.disabled = false;
-                    timerStatusLabel.textContent = 'Recording Live (Browser Mode)';
+                    timerStatusLabel.textContent = 'Recording Live (Desktop Soundcard)';
                     recordingStatusPill.textContent = 'Recording';
-                } catch (e) {
-                    alert('Browser recording error: ' + (e.message || e));
+
+                    startStatusPolling();
+                    lucide.createIcons();
+                } else {
+                    alert('🎙️ Desktop Dual Soundcard Recorder Notice: ' + (data.message || 'Please check microphone & speaker permissions.'));
                 }
-            } else {
-                const formData = new FormData();
-                formData.append('mic_id', micSelect.value || '');
-                formData.append('speaker_id', speakerSelect.value || '');
-
-                try {
-                    const res = await fetch('/api/record/start', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = await res.json();
-
-                    if (data.status === 'recording_started' || data.status === 'already_recording') {
-                        state.isRecording = true;
-                        state.isPaused = false;
-                        state.isMicMuted = false;
-                        state.isSpeakerMuted = false;
-
-                        if (muteMicBtn) {
-                            muteMicBtn.innerHTML = '<i data-lucide="mic"></i> Mic On';
-                            muteMicBtn.classList.remove('btn-danger');
-                            muteMicBtn.classList.add('btn-secondary');
-                        }
-                        if (muteSpeakerBtn) {
-                            muteSpeakerBtn.innerHTML = '<i data-lucide="volume-2"></i> Speaker On';
-                            muteSpeakerBtn.classList.remove('btn-danger');
-                            muteSpeakerBtn.classList.add('btn-secondary');
-                        }
-
-                        startRecordBtn.disabled = true;
-                        pauseRecordBtn.disabled = false;
-                        stopRecordBtn.disabled = false;
-                        timerStatusLabel.textContent = 'Recording Live';
-                        recordingStatusPill.textContent = 'Recording';
-
-                        startStatusPolling();
-                        lucide.createIcons();
-                    } else {
-                        console.warn('Desktop WASAPI audio bridge unavailable on this system. Falling back to Browser Recording mode...');
-                        if (engineSelect) engineSelect.value = 'web';
-                        await startWebBrowserRecording();
-                        startRecordBtn.disabled = true;
-                        pauseRecordBtn.disabled = false;
-                        stopRecordBtn.disabled = false;
-                        timerStatusLabel.textContent = 'Browser Recording Live';
-                        recordingStatusPill.textContent = 'Recording (Web)';
-                        alert('🎙️ Desktop soundcard bridge unavailable on this system. Automatically switched to Browser Microphone & Tab Audio recording!');
-                    }
-                } catch (e) {
-                    console.warn('Desktop WASAPI audio bridge error. Falling back to Browser Recording mode...', e);
-                    if (engineSelect) engineSelect.value = 'web';
-                    try {
-                        await startWebBrowserRecording();
-                        startRecordBtn.disabled = true;
-                        pauseRecordBtn.disabled = false;
-                        stopRecordBtn.disabled = false;
-                        timerStatusLabel.textContent = 'Browser Recording Live';
-                        recordingStatusPill.textContent = 'Recording (Web)';
-                        alert('🎙️ Desktop soundcard bridge unavailable on this system. Automatically switched to Browser Microphone & Tab Audio recording!');
-                    } catch (err) {
-                        alert('Failed to start recording: ' + (err.message || err));
-                    }
-                }
+            } catch (e) {
+                alert('Failed to start desktop recording: ' + (e.message || e));
             }
         });
 
         pauseRecordBtn.addEventListener('click', async () => {
-            const engine = engineSelect ? engineSelect.value : 'desktop';
-            if (engine === 'web') {
-                state.isPaused = !state.isPaused;
-                if (state.isPaused) {
-                    pauseRecordBtn.innerHTML = '<i data-lucide="play"></i> Resume';
-                    timerStatusLabel.textContent = 'Recording Paused';
-                    recordingStatusPill.textContent = 'Paused';
-                } else {
-                    pauseRecordBtn.innerHTML = '<i data-lucide="pause"></i> Pause';
-                    timerStatusLabel.textContent = 'Recording Live';
-                    recordingStatusPill.textContent = 'Recording';
-                }
-                lucide.createIcons();
-                return;
-            }
-
             try {
                 const res = await fetch('/api/record/pause', { method: 'POST' });
                 const data = await res.json();
@@ -613,34 +562,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const title = meetingTitleInput.value.trim() || 'Live Recorded Meeting';
             const lang = recorderLanguageSelect ? recorderLanguageSelect.value : 'English';
-            const engine = engineSelect ? engineSelect.value : 'desktop';
 
             stopRecordBtn.disabled = true;
             timerStatusLabel.textContent = 'Transcribing & Processing...';
 
             try {
-                let data = null;
-                if (engine === 'web') {
-                    if (!webWavEncoder) {
-                        alert('Browser live recording stream was not initialized. Please click "Start Recording" first.');
-                        startRecordBtn.disabled = false;
-                        stopRecordBtn.disabled = true;
-                        timerStatusLabel.textContent = 'Standby';
-                        state.isRecording = false;
-                        return;
-                    }
-                    data = await stopWebBrowserRecording(title, lang);
-                } else {
-                    const formData = new FormData();
-                    formData.append('meeting_title', title);
-                    formData.append('target_language', lang);
+                const formData = new FormData();
+                formData.append('meeting_title', title);
+                formData.append('target_language', lang);
 
-                    const res = await fetch('/api/record/stop', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    data = await res.json();
-                }
+                const res = await fetch('/api/record/stop', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
 
                 state.isRecording = false;
                 state.isPaused = false;
