@@ -1662,6 +1662,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            if (hasNewCompletion || activeJobs.length > 0) {
+                await loadAiLogs();
+            }
+
             if (hasNewCompletion) {
                 await loadMeetings(true);
                 await loadTasks();
@@ -1709,6 +1713,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- AI Logs Audit Inspector ---
     let currentAiLogs = [];
+    let aiLogsPollInterval = null;
+
     function setupAiLogsEvents() {
         const aiLogsTabBtn = document.querySelector('.nav-tab[data-tab="aiLogsTab"]');
         if (aiLogsTabBtn) {
@@ -1717,6 +1723,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadAiLogs();
             });
         }
+
+        // Auto-refresh logs every 2 seconds when AI Logs Audit tab is active
+        if (aiLogsPollInterval) clearInterval(aiLogsPollInterval);
+        aiLogsPollInterval = setInterval(() => {
+            if (state.activeTab === 'aiLogsTab') {
+                loadAiLogs();
+            }
+        }, 2000);
 
         const clearAiLogsBtn = document.getElementById('clearAiLogsBtn');
         if (clearAiLogsBtn) {
