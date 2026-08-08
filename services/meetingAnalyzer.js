@@ -124,6 +124,10 @@ class MeetingAnalyzer {
             return this._emptyAnalysis(meetingTitle, targetLanguage);
         }
 
+        // Attempt 1: Yogesh Chat API (Port 3005)
+        const ycRes = await this._analyzeYogeshChat(transcriptText, meetingTitle, targetLanguage);
+        if (ycRes) return ycRes;
+
         if (this.apiKey) {
             try {
                 const genAI = new GoogleGenerativeAI(this.apiKey);
