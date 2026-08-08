@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupInsightsEvents();
         setupModalEvents();
         setupJobsEvents();
+        setupAiLogsEvents();
         initCanvasWaveform();
     }
 
@@ -1700,6 +1701,148 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.error('loadJobs notice:', e);
         }
+    }
+
+    // --- AI Logs Audit Inspector ---
+    let currentAiLogs = [];
+    function setupAiLogsEvents() {
+        const aiLogsTabBtn = document.querySelector('.nav-tab[data-tab="aiLogsTab"]');
+        if (aiLogsTabBtn) {
+            aiLogsTabBtn.addEventListener('click', () => {
+                activateTab('aiLogsTab');
+                loadAiLogs();
+            });
+        }
+
+        const clearAiLogsBtn = document.getElementById('clearAiLogsBtn');
+        if (clearAiLogsBtn) {
+            clearAiLogsBtn.addEventListener('click', async () => {
+                if (!confirm('Are you sure you want to clear all stored AI request & response logs?')) return;
+                try {
+                    await fetch('/api/ai/logs', { method: 'DELETE' });
+                    loadAiLogs();
+                } catch (e) {
+                    alert('Failed to clear logs: ' + (e.message || e));
+                }
+            });
+        }
+
+        const aiLogsSearchInput = document.getElementById('aiLogsSearchInput');
+        if (aiLogsSearchInput) {
+            aiLogsSearchInput.addEventListener('input', () => {
+                renderAiLogsTable(aiLogsSearchInput.value.trim().toLowerCase());
+            });
+        }
+
+        const closeAiLogDetailModalBtn = document.getElementById('closeAiLogDetailModalBtn');
+        const closeAiLogDetailFooterBtn = document.getElementById('closeAiLogDetailFooterBtn');
+        const aiLogDetailModal = document.getElementById('aiLogDetailModal');
+
+        if (closeAiLogDetailModalBtn && aiLogDetailModal) {
+            closeAiLogDetailModalBtn.addEventListener('click', () => aiLogDetailModal.classList.add('hidden'));
+        }
+        if (closeAiLogDetailFooterBtn && aiLogDetailModal) {
+            closeAiLogDetailFooterBtn.addEventListener('click', () => aiLogDetailModal.classList.add('hidden'));
+        }
+
+        const copyAiPromptBtn = document.getElementById('copyAiPromptBtn');
+        if (copyAiPromptBtn) {
+            copyAiPromptBtn.addEventListener('click', () => {
+                const txt = document.getElementById('logModalPromptTextarea').value;
+                navigator.clipboard.writeText(txt);
+                alert('Copied AI prompt to clipboard!');
+            });
+        }
+
+        const copyAiResponseBtn = document.getElementById('copyAiResponseBtn');
+        if (copyAiResponseBtn) {
+            copyAiResponseBtn.addEventListener('click', () => {
+                const txt = document.getElementById('logModalResponseTextarea').value;
+                navigator.clipboard.writeText(txt);
+                alert('Copied AI raw response to clipboard!');
+            });
+        }
+    }
+
+    async function loadAiLogs() {
+        const tableBody = document.getElementById('aiLogsTableBody');
+        if (!tableBody) return;
+        try {
+            const res = await fetch('/api/ai/logs');
+            currentAiLogs = await res.json();
+            renderAiLogsTable();
+        } catch (e) {
+            console.error('loadAiLogs error:', e);
+        }
+    }
+
+    function renderAiLogsTable(filterQuery = '') {
+        const tableBody = document.getElementById('aiLogsTableBody');
+        if (!tableBody) return;
+        tableBody.innerHTML = '';
+
+        const filtered = currentAiLogs.filter(log => {
+            if (!filterQuery) return true;
+            return (log.provider || '').toLowerCase().includes(filterQuery) ||
+                   (log.meeting_title || '').toLowerCase().includes(filterQuery) ||
+                   (log.prompt || '').toLowerCase().includes(filterQuery);
+        });
+
+        if (filtered.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="7" class="empty-state" style="text-align: center; padding: 30px;">No AI request/response logs found. Run a meeting recording or analysis to view payload logs.</td></tr>`;
+            return;
+        }
+
+        filtered.forEach(log => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            
+            const badgeClass = log.status === 'success' ? 'badge-success' : 'badge-category';
+            const latencyStr = log.duration_ms ? `${log.duration_ms} ms` : 'N/A';
+
+            tr.innerHTML = `
+                <td style="padding: 12px; font-size: 0.85rem; color: #cbd5e1; font-family: monospace;">${escapeHtml(log.timestamp || '')}</td>
+                <td style="padding: 12px;"><span class="badge badge-primary"><i data-lucide="cpu" style="width: 13px; height: 13px; vertical-align: middle; margin-right: 4px;"></i> ${escapeHtml(log.provider || 'AI Engine')}</span></td>
+                <td style="padding: 12px; font-weight: 600; color: #f8fafc;">${escapeHtml(log.meeting_title || 'Session')}</td>
+                <td style="padding: 12px; font-size: 0.85rem; color: #94a3b8;">${escapeHtml(log.target_language || 'English')}</td>
+                <td style="padding: 12px; font-size: 0.85rem; color: #cbd5e1; font-family: monospace;">${latencyStr}</td>
+                <td style="padding: 12px;"><span class="badge ${badgeClass}">${escapeHtml(log.status || 'OK')}</span></td>
+                <td style="padding: 12px; text-align: right;">
+                    <button class="btn btn-secondary btn-xs view-log-payload-btn" data-id="${log.id}">
+                        <i data-lucide="eye"></i> Inspect Prompt & Reply
+                    </button>
+                </td>
+            `;
+
+            const viewBtn = tr.querySelector('.view-log-payload-btn');
+            if (viewBtn) {
+                viewBtn.addEventListener('click', () => openAiLogModal(log));
+            }
+
+            tableBody.appendChild(tr);
+        });
+
+        lucide.createIcons();
+    }
+
+    function openAiLogModal(log) {
+        const modal = document.getElementById('aiLogDetailModal');
+        if (!modal) return;
+
+        document.getElementById('logModalProviderBadge').textContent = log.provider || 'AI Engine';
+        document.getElementById('logModalTitleText').textContent = log.meeting_title || 'Meeting Session';
+        document.getElementById('logModalMetaText').textContent = `${log.timestamp || ''} • ${log.duration_ms ? log.duration_ms + 'ms' : ''} • ${log.target_language || 'English'}`;
+
+        document.getElementById('logModalPromptTextarea').value = log.prompt || 'No prompt payload available.';
+        
+        let replyDisplay = log.response_raw || '';
+        if (!replyDisplay && log.parsed_output) {
+            replyDisplay = JSON.stringify(log.parsed_output, null, 2);
+        }
+        document.getElementById('logModalResponseTextarea').value = replyDisplay || 'No response payload available.';
+
+        modal.classList.remove('hidden');
+        lucide.createIcons();
     }
 
     function escapeHtml(str) {

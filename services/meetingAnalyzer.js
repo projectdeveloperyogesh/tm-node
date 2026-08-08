@@ -398,9 +398,10 @@ class MeetingAnalyzer {
                     const parsed = JSON.parse(cleanJson.trim());
                     const enriched = this._enrichAnalysisOutput(parsed);
                     enriched.transcript = parsed.transcript || transcriptText || `Audio recording analyzed for ${meetingTitle}.`;
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success");
                     return enriched;
                 } catch (parseErr) {
-                    return {
+                    const fallbackRes = {
                         summary: reply.substring(0, 500),
                         items_discussed: [{ topic: "Meeting Notes", details: reply, category: "AI Notes" }],
                         tasks: [{
@@ -416,12 +417,42 @@ class MeetingAnalyzer {
                         }],
                         transcript: transcriptText || reply
                     };
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback");
+                    return fallbackRes;
                 }
             }
         } catch (err) {
             console.warn("Yogesh Chat API (Port 3005) notice:", err.message);
         }
         return null;
+    }
+
+    _recordAiLog(provider, meetingTitle, targetLanguage, prompt, responseRaw, parsedOutput, durationMs, status = "success") {
+        try {
+            const dataDir = path.join(__dirname, '..', 'data');
+            if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+            const logsFile = path.join(dataDir, 'ai_logs.json');
+            let logs = [];
+            if (fs.existsSync(logsFile)) {
+                try { logs = JSON.parse(fs.readFileSync(logsFile, 'utf8')); } catch (e) { logs = []; }
+            }
+            const entry = {
+                id: "log_" + Math.random().toString(36).substring(2, 10),
+                timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                provider: provider,
+                meeting_title: meetingTitle,
+                target_language: targetLanguage,
+                prompt: prompt,
+                response_raw: responseRaw,
+                parsed_output: parsedOutput,
+                duration_ms: durationMs,
+                status: status
+            };
+            logs.unshift(entry);
+            fs.writeFileSync(logsFile, JSON.stringify(logs.slice(0, 100), null, 2), 'utf8');
+        } catch (err) {
+            console.warn("Error saving AI log:", err.message);
+        }
     }
 
     _emptyAnalysis(meetingTitle, targetLanguage) {

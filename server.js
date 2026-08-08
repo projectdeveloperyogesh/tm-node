@@ -621,6 +621,18 @@ app.post('/api/settings', (req, res) => {
     res.json({ status: "saved" });
 });
 
+const AI_LOGS_FILE = path.join(DATA_DIR, 'ai_logs.json');
+
+app.get('/api/ai/logs', (req, res) => {
+    const logs = loadJson(AI_LOGS_FILE, []);
+    res.json(logs);
+});
+
+app.delete('/api/ai/logs', (req, res) => {
+    saveJson(AI_LOGS_FILE, []);
+    res.json({ status: "cleared" });
+});
+
 // Start Express Web Server
 app.listen(PORT, () => {
     console.log(`TaskPulse AI (Option 1 Hybrid Engine) running on http://127.0.0.1:${PORT}`);
