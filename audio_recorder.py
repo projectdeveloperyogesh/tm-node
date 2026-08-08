@@ -263,46 +263,64 @@ class DualAudioRecorder:
         if self.mic_device_index is None or self.pa is None:
             return
 
+        # Candidate mic indices to try: requested mic_device_index -> default input device -> index 0
+        mic_candidates = []
+        if self.mic_device_index is not None:
+            mic_candidates.append(self.mic_device_index)
+        try:
+            def_idx = self.pa.get_default_input_device_info().get("index")
+            if def_idx is not None and def_idx not in mic_candidates:
+                mic_candidates.append(def_idx)
+        except Exception:
+            pass
+        if 0 not in mic_candidates:
+            mic_candidates.append(0)
+
         stream = None
         rate = 44100
         channels = 1
         chunk = 1024
+        active_mic_idx = None
 
-        try:
-            info = self.pa.get_device_info_by_index(self.mic_device_index)
-            dev_rate = int(info.get("defaultSampleRate", 44100))
-            dev_ch = info.get("maxInputChannels", 1)
-        except Exception:
-            dev_rate = 44100
-            dev_ch = 1
+        for mic_idx in mic_candidates:
+            try:
+                info = self.pa.get_device_info_by_index(mic_idx)
+                dev_rate = int(info.get("defaultSampleRate", 44100))
+                dev_ch = info.get("maxInputChannels", 1)
+            except Exception:
+                dev_rate = 44100
+                dev_ch = 1
 
-        rate_candidates = [dev_rate, 48000, 44100, 16000]
-        channel_candidates = [min(2, dev_ch) if dev_ch > 0 else 1, 1, 2]
+            rate_candidates = [dev_rate, 48000, 44100, 16000]
+            channel_candidates = [min(2, dev_ch) if dev_ch > 0 else 1, 1, 2]
 
-        for r in rate_candidates:
-            for c in channel_candidates:
-                try:
-                    stream = self.pa.open(
-                        format=pyaudio.paInt16,
-                        channels=c,
-                        rate=r,
-                        input=True,
-                        input_device_index=self.mic_device_index,
-                        frames_per_buffer=chunk
-                    )
-                    rate = r
-                    channels = c
+            for r in rate_candidates:
+                for c in channel_candidates:
+                    try:
+                        stream = self.pa.open(
+                            format=pyaudio.paInt16,
+                            channels=c,
+                            rate=r,
+                            input=True,
+                            input_device_index=mic_idx,
+                            frames_per_buffer=chunk
+                        )
+                        rate = r
+                        channels = c
+                        active_mic_idx = mic_idx
+                        break
+                    except Exception:
+                        stream = None
+                if stream is not None:
                     break
-                except Exception:
-                    stream = None
             if stream is not None:
                 break
 
         if stream is None:
-            print(f"Mic worker notice: Could not open stream for mic device {self.mic_device_index}")
+            print(f"Mic worker notice: Could not open stream for mic devices {mic_candidates}")
             return
 
-        print(f"Mic stream active on device {self.mic_device_index} (rate={rate}, ch={channels})")
+        print(f"Mic stream active on device {active_mic_idx} (rate={rate}, ch={channels})")
 
         while self.is_recording:
             if self.is_paused:
