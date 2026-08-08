@@ -331,17 +331,32 @@
                             </div>
                         </div>
 
+                        <!-- NEW: Formatted Chat Agent Description Card (Full Chat Response Format) -->
+                        <div class="glass-card margin-top-20">
+                            <div class="card-header flex-between">
+                                <h2><i data-lucide="bot" class="accent-icon"></i> Formatted AI Chat Assistant Output</h2>
+                                <div class="flex-align-center gap-10">
+                                    <button id="copyInsightsReportBtn" class="btn btn-primary btn-xs" title="Copy Full Formatted Chat Report"><i data-lucide="copy"></i> Copy Full Description</button>
+                                    <span class="badge badge-success">Full Chat Output</span>
+                                </div>
+                            </div>
+                            <p class="help-text margin-top-5" style="color: #94a3b8; font-size: 0.82rem;">Decoded full description formatted like a chat AI assistant response (ready to copy & paste into Slack, Docs, or Chat):</p>
+                            <div class="form-group margin-top-10">
+                                <textarea id="insightsFormattedReportText" class="custom-input" style="height: 240px; font-family: system-ui, -apple-system, sans-serif; font-size: 0.88rem; line-height: 1.5; background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(56, 189, 248, 0.3); white-space: pre-wrap;" readonly placeholder="Formatted full description chat output will appear here..."></textarea>
+                            </div>
+                        </div>
+
                         <!-- NEW: Decoded Raw AI Response & JSON Schema Inspector -->
                         <div class="glass-card margin-top-20">
                             <div class="card-header flex-between">
-                                <h2><i data-lucide="code-2" class="accent-icon"></i> Decoded Raw AI Response Payload (JSON Schema)</h2>
+                                <h2><i data-lucide="code-2" class="accent-icon"></i> Raw AI Response Payload (JSON Schema)</h2>
                                 <div class="flex-align-center gap-10">
                                     <button id="copyInsightsRawResponseBtn" class="btn btn-secondary btn-xs" title="Copy Raw Response Output"><i data-lucide="copy"></i> Copy Raw JSON</button>
-                                    <span class="badge badge-success" id="insightsJsonBadge">Decoded JSON</span>
+                                    <span class="badge badge-category" id="insightsJsonBadge">Raw JSON</span>
                                 </div>
                             </div>
                             <div class="form-group margin-top-10">
-                                <textarea id="insightsRawResponseText" class="custom-input" style="height: 200px; font-family: monospace; font-size: 0.83rem; background: rgba(15, 23, 42, 0.8); color: #38bdf8; white-space: pre-wrap;" readonly placeholder="Raw AI response payload received from Yogesh Chat (Port 3005) or Gemini will appear here..."></textarea>
+                                <textarea id="insightsRawResponseText" class="custom-input" style="height: 180px; font-family: monospace; font-size: 0.83rem; background: rgba(15, 23, 42, 0.8); color: #38bdf8; white-space: pre-wrap;" readonly placeholder="Raw AI response payload received from Yogesh Chat (Port 3005) or Gemini will appear here..."></textarea>
                             </div>
                         </div>
                     </div>
@@ -685,7 +700,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="/static/app.js?v=1.0.9"></script>
+    <script src="/static/app.js?v=1.1.0"></script>
     <script>
         lucide.createIcons();
     </script>

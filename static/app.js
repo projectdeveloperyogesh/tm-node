@@ -1085,6 +1085,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const copyInsightsReportBtn = document.getElementById('copyInsightsReportBtn');
+        if (copyInsightsReportBtn) {
+            copyInsightsReportBtn.addEventListener('click', () => {
+                const txt = document.getElementById('insightsFormattedReportText').value;
+                copyToClipboard(txt, 'Formatted AI Chat Assistant Description copied to clipboard!');
+            });
+        }
+
         const copyInsightsPromptBtn = document.getElementById('copyInsightsPromptBtn');
         if (copyInsightsPromptBtn) {
             copyInsightsPromptBtn.addEventListener('click', () => {
@@ -1288,6 +1296,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, null, 2);
             }
             insightsRawResponseText.value = rawStr;
+        }
+
+        // Formatted AI Chat Assistant Description Report
+        const insightsFormattedReportText = document.getElementById('insightsFormattedReportText');
+        if (insightsFormattedReportText) {
+            let chatReport = `🤖 AI CHAT ASSISTANT - MEETING INTELLIGENCE REPORT\n`;
+            chatReport += `=========================================================\n`;
+            chatReport += `📌 Meeting Title : ${meeting.title || 'Live Meeting Session'}\n`;
+            chatReport += `📅 Date Recorded : ${meeting.created_at || 'Recent Session'}\n`;
+            chatReport += `🗣️ Target Language: ${meeting.language || 'English'}\n`;
+            chatReport += `=========================================================\n\n`;
+
+            chatReport += `📝 EXECUTIVE SUMMARY:\n`;
+            chatReport += `${meeting.summary || 'No summary generated for this session.'}\n\n`;
+
+            chatReport += `💬 ITEMS & TOPICS DISCUSSED (${meeting.items_discussed ? meeting.items_discussed.length : 0}):\n`;
+            if (meeting.items_discussed && meeting.items_discussed.length > 0) {
+                meeting.items_discussed.forEach((item, idx) => {
+                    chatReport += `${idx + 1}. [${item.category || 'Topic'}] ${item.topic || 'Discussion Point'}\n`;
+                    chatReport += `   • Details: ${item.details || 'N/A'}\n\n`;
+                });
+            } else {
+                chatReport += `• No specific discussion topics extracted.\n\n`;
+            }
+
+            chatReport += `✅ EXTRACTED ACTION TASKS & MILESTONES (${meetingTasks.length}):\n`;
+            if (meetingTasks.length > 0) {
+                meetingTasks.forEach((t, idx) => {
+                    chatReport += `${idx + 1}. 🎯 ${t.title}\n`;
+                    chatReport += `   • Priority  : [${(t.priority || 'Medium').toUpperCase()}]\n`;
+                    chatReport += `   • Assignee  : ${t.assignee || 'Unassigned'}\n`;
+                    chatReport += `   • Category  : ${t.category || 'Follow-up'}\n`;
+                    chatReport += `   • Due Date  : ${t.due_date || 'Pending'}\n`;
+                    if (t.description) chatReport += `   • Details   : ${t.description}\n`;
+                    if (t.subtasks && t.subtasks.length > 0) {
+                        chatReport += `   • Subtasks  :\n`;
+                        t.subtasks.forEach(st => {
+                            const titleStr = typeof st === 'string' ? st : (st.title || 'Subtask');
+                            const isDone = typeof st === 'object' && st.completed ? '[x]' : '[ ]';
+                            chatReport += `     ${isDone} ${titleStr}\n`;
+                        });
+                    }
+                    chatReport += `\n`;
+                });
+            } else {
+                chatReport += `• No action items extracted for this meeting session.\n\n`;
+            }
+
+            if (meeting.transcript) {
+                chatReport += `---------------------------------------------------------\n`;
+                chatReport += `🎙️ FULL TRANSCRIPT SNIPPET:\n`;
+                chatReport += `${meeting.transcript}\n`;
+            }
+
+            insightsFormattedReportText.value = chatReport;
         }
 
         lucide.createIcons();
