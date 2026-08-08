@@ -382,6 +382,79 @@ app.post('/api/record/stop_web', uploadRecordings.single('file'), async (req, re
     }
 });
 
+// Dedicated Android App Recording Upload & Transcription API
+app.post('/api/android/upload', uploadRecordings.single('file'), async (req, res) => {
+    try {
+        const file = req.file;
+        const meetingTitle = req.body.meeting_title || "Android Recorded Meeting";
+        const targetLanguage = req.body.target_language || "English";
+        const liveTranscript = req.body.live_transcript || "";
+
+        if (!file) {
+            return res.status(400).json({ detail: "No audio file received." });
+        }
+
+        console.log(`[Node.js Express Server] Processing Android upload '${file.filename}' for '${meetingTitle}'...`);
+
+        const processedWav = await mediaProcessor.processMediaFile(file.path);
+        const apiKey = getGeminiApiKey();
+        const analyzer = getAnalyzer();
+        const speechService = new SpeechService(apiKey);
+
+        let analysis = await analyzer.analyzeAudioFile(processedWav, meetingTitle, targetLanguage);
+        let transcriptText = liveTranscript.trim() || analysis.transcript;
+
+        if (!transcriptText || transcriptText.trim().length === 0) {
+            const transcribeRes = await speechService.transcribeAudio(processedWav);
+            transcriptText = transcribeRes.text;
+        }
+
+        const meetingId = Math.random().toString(36).substring(2, 10);
+        const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+        const meetingObj = {
+            id: meetingId,
+            title: meetingTitle,
+            language: targetLanguage,
+            created_at: createdAt,
+            audio_url: `/recordings/${file.filename}`,
+            audio_filename: file.filename,
+            transcript: transcriptText,
+            segments: [{ start: "00:00", end: "End", speaker: "Speaker", text: transcriptText }],
+            summary: analysis.summary,
+            items_discussed: analysis.items_discussed,
+            task_count: analysis.tasks.length,
+            prompt: analysis.prompt || "",
+            curl_command: analysis.curl_command || "",
+            response_raw: analysis.response_raw || ""
+        };
+
+        const meetings = loadJson(MEETINGS_FILE, []);
+        meetings.unshift(meetingObj);
+        saveJson(MEETINGS_FILE, meetings);
+
+        const existingTasks = loadJson(TASKS_FILE, []);
+        const newTasks = analysis.tasks.map(t => ({
+            ...t,
+            meeting_id: meetingId,
+            language: targetLanguage
+        }));
+        newTasks.forEach(t => existingTasks.unshift(t));
+        saveJson(TASKS_FILE, existingTasks);
+
+        console.log(`[Node.js Express Server] Android session '${meetingTitle}' complete with ${newTasks.length} tasks.`);
+
+        res.json({
+            status: "success",
+            meeting: meetingObj,
+            tasks: newTasks
+        });
+    } catch (err) {
+        console.error(`[Node.js Express Server] Error in Android upload: ${err.message}`);
+        res.status(500).json({ detail: err.message });
+    }
+});
+
 // Upload Media Files (.wav, .mp3, .mp4, .webm)
 app.post('/api/upload', uploadMedia.single('file'), async (req, res) => {
     try {
