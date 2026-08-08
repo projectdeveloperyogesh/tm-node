@@ -713,19 +713,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const scs = String(secs % 60).padStart(2, '0');
                 recordingTimer.textContent = `${hrs}:${mins}:${scs}`;
 
-                // Update sound meters with auto-scaling for float / integer values
+                // Update sound meters (0% - 100% percentage scaling)
                 const rawMic = data.mic_level || 0;
                 const rawSpk = data.speaker_level || 0;
 
-                let micLvl = 0;
-                if (rawMic > 0) {
-                    micLvl = rawMic <= 1.0 ? Math.min(100, Math.max(2, Math.round(rawMic * 1000))) : Math.min(100, Math.round(rawMic));
-                }
-
-                let spkLvl = 0;
-                if (rawSpk > 0) {
-                    spkLvl = rawSpk <= 1.0 ? Math.min(100, Math.max(2, Math.round(rawSpk * 1000))) : Math.min(100, Math.round(rawSpk));
-                }
+                const micLvl = Math.min(100, Math.max(0, Math.round(rawMic)));
+                const spkLvl = Math.min(100, Math.max(0, Math.round(rawSpk)));
 
                 micLevelBar.style.width = `${micLvl}%`;
                 micLevelVal.textContent = `${micLvl}%`;

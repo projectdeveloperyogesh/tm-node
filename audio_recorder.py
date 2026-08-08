@@ -338,15 +338,14 @@ class DualAudioRecorder:
                         self.mic_frames.append((data, rate, channels))
                         self.mic_live_chunks.append((data, rate, channels))
                         
-                        # RMS + Peak logarithmic dB decibel calculation with ultra-low hardware gain boost
+                        # Standardized RMS dB decibel calculation (-60 dB to 0 dB -> 0% to 100%)
                         samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
                         if len(samples) > 0:
                             rms = float(np.sqrt(np.mean(samples**2)))
-                            peak = float(np.max(np.abs(samples)))
-                            if rms > 1e-7:
-                                db_val = (np.log10(max(rms, 1e-7)) + 6.5) / 6.5 * 100.0
-                                val = max(rms * 1500000.0, peak * 500000.0, db_val)
-                                self.mic_level = float(np.clip(val, 0.0, 100.0))
+                            if rms > 1e-5:
+                                db = 20.0 * np.log10(max(rms, 1e-5))
+                                lvl = (db + 60.0) / 60.0 * 100.0
+                                self.mic_level = float(np.clip(lvl, 0.0, 100.0))
                             else:
                                 self.mic_level = 0.0
                         else:
@@ -424,13 +423,16 @@ class DualAudioRecorder:
                         self.speaker_frames.append((data, rate, channels))
                         self.spk_live_chunks.append((data, rate, channels))
 
-                        # RMS + Peak decibel calculation with logarithmic/linear scaling
+                        # Standardized RMS dB decibel calculation (-60 dB to 0 dB -> 0% to 100%)
                         samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
                         if len(samples) > 0:
-                            rms = np.sqrt(np.mean(samples**2))
-                            peak = np.max(np.abs(samples))
-                            val = max(rms * 1500.0, peak * 800.0)
-                            self.speaker_level = float(np.clip(val, 0.0, 100.0))
+                            rms = float(np.sqrt(np.mean(samples**2)))
+                            if rms > 1e-5:
+                                db = 20.0 * np.log10(max(rms, 1e-5))
+                                lvl = (db + 60.0) / 60.0 * 100.0
+                                self.speaker_level = float(np.clip(lvl, 0.0, 100.0))
+                            else:
+                                self.speaker_level = 0.0
                         else:
                             self.speaker_level = 0.0
             except Exception:
