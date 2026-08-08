@@ -320,15 +320,17 @@ class DualAudioRecorder:
                         self.mic_frames.append((data, rate, channels))
                         self.mic_live_chunks.append((data, rate, channels))
                         
-                        # RMS + Peak decibel calculation with AGC software gain boost
+                        # RMS + Peak logarithmic dB decibel calculation with ultra-low hardware gain boost
                         samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
                         if len(samples) > 0:
-                            rms = np.sqrt(np.mean(samples**2))
-                            peak = np.max(np.abs(samples))
-                            val = max(rms * 50000.0, peak * 20000.0)
-                            if val < 5.0 and rms > 0.000001:
-                                val = Math.min(100.0, rms * 100000.0) if 'Math' in globals() else min(100.0, rms * 100000.0)
-                            self.mic_level = float(np.clip(val, 0.0, 100.0))
+                            rms = float(np.sqrt(np.mean(samples**2)))
+                            peak = float(np.max(np.abs(samples)))
+                            if rms > 1e-7:
+                                db_val = (np.log10(max(rms, 1e-7)) + 6.5) / 6.5 * 100.0
+                                val = max(rms * 1500000.0, peak * 500000.0, db_val)
+                                self.mic_level = float(np.clip(val, 0.0, 100.0))
+                            else:
+                                self.mic_level = 0.0
                         else:
                             self.mic_level = 0.0
             except Exception:
