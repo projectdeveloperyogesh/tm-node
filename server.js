@@ -218,6 +218,15 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(TEMPLATES_DIR, 'index.html'));
 });
 
+// Serve API Documentation Portal
+app.get('/api-docs', (req, res) => {
+    res.sendFile(path.join(TEMPLATES_DIR, 'api_docs.html'));
+});
+
+app.get('/api/docs', (req, res) => {
+    res.sendFile(path.join(TEMPLATES_DIR, 'api_docs.html'));
+});
+
 // Audio Devices List (Real Soundcard Hardware)
 app.get('/api/devices', async (req, res) => {
     try {

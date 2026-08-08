@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskPulse AI - REST API Documentation & Reference Portal</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .docs-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+            margin-top: 20px;
+            align-items: start;
+        }
+
+        .docs-sidebar {
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .sidebar-group-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-cyan);
+            margin: 16px 0 8px 8px;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-link:hover, .sidebar-link.active {
+            background: rgba(56, 189, 248, 0.12);
+            color: #ffffff;
+        }
+
+        .method-badge {
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .method-post { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
+        .method-get { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .method-put { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+        .method-delete { background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
+
+        .api-card {
+            margin-bottom: 24px;
+        }
+
+        .api-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .api-title-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .api-path {
+            font-family: 'Fira Code', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0;
+            font-size: 13px;
+        }
+
+        .params-table th, .params-table td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .params-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .code-box {
+            position: relative;
+            background: #050811;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 14px;
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            color: #e2e8f0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #cbd5e1;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+        }
+
+        .try-box {
+            margin-top: 14px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px dashed rgba(56, 189, 248, 0.3);
+            border-radius: 10px;
+            padding: 14px;
+        }
+
+        .param-name {
+            font-family: 'Fira Code', monospace;
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+        .param-type {
+            font-family: 'Fira Code', monospace;
+            color: var(--accent-purple);
+            font-size: 11px;
+        }
+        .param-req {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--accent-pink);
+        }
+        .param-opt {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .search-input {
+            width: 240px;
+            background: #101726;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 6px 12px;
+            color: #fff;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="navbar">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i data-lucide="book-open"></i>
+                </div>
+                <div>
+                    <h1 class="logo-title">TaskPulse <span class="accent-text">AI</span> REST API</h1>
+                    <p class="logo-subtitle">Complete API Endpoint Documentation & Interactive Reference Portal</p>
+                </div>
+            </div>
+
+            <div class="header-stats">
+                <input type="text" id="apiSearch" class="search-input" placeholder="Search API endpoints...">
+                <a href="/" class="btn btn-secondary btn-sm flex-align-center gap-5">
+                    <i data-lucide="arrow-left"></i>
+                    <span>Back to Web App</span>
+                </a>
+            </div>
+        </header>
+
+        <div class="docs-container">
+            <!-- Left Sidebar Navigation -->
+            <aside class="docs-sidebar glass-card">
+                <div class="sidebar-group-title">Overview</div>
+                <a href="#quickstart" class="sidebar-link active"><i data-lucide="zap"></i> Quick Start</a>
+
+                <div class="sidebar-group-title">Recording & Upload APIs</div>
+                <a href="#endpoint-android-upload" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/android/upload</a>
+                <a href="#endpoint-record-upload" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/upload</a>
+                <a href="#endpoint-audio-upload" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/audio/upload</a>
+                <a href="#endpoint-upload" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/upload</a>
+                <a href="#endpoint-stop-web" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/stop_web</a>
+                <a href="#endpoint-transcribe-text" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/transcribe/text</a>
+
+                <div class="sidebar-group-title">Server Recording Controls</div>
+                <a href="#endpoint-rec-start" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/start</a>
+                <a href="#endpoint-rec-pause" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/pause</a>
+                <a href="#endpoint-rec-mute" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/mute</a>
+                <a href="#endpoint-rec-status" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/record/status</a>
+                <a href="#endpoint-rec-stop" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/record/stop</a>
+
+                <div class="sidebar-group-title">Meetings Management</div>
+                <a href="#endpoint-meetings-list" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/meetings</a>
+                <a href="#endpoint-meetings-get" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/meetings/:id</a>
+                <a href="#endpoint-meetings-reanalyze" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/meetings/:id/reanalyze</a>
+                <a href="#endpoint-meetings-del" class="sidebar-link"><span class="method-badge method-delete">DELETE</span> /api/meetings/:id</a>
+
+                <div class="sidebar-group-title">Action Tasks Board</div>
+                <a href="#endpoint-tasks-list" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/tasks</a>
+                <a href="#endpoint-tasks-create" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/tasks</a>
+                <a href="#endpoint-tasks-update" class="sidebar-link"><span class="method-badge method-put">PUT</span> /api/tasks/:id</a>
+                <a href="#endpoint-tasks-del" class="sidebar-link"><span class="method-badge method-delete">DELETE</span> /api/tasks/:id</a>
+
+                <div class="sidebar-group-title">Settings & Audit Logs</div>
+                <a href="#endpoint-settings-get" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/settings</a>
+                <a href="#endpoint-settings-post" class="sidebar-link"><span class="method-badge method-post">POST</span> /api/settings</a>
+                <a href="#endpoint-logs-get" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/ai/logs</a>
+                <a href="#endpoint-jobs-get" class="sidebar-link"><span class="method-badge method-get">GET</span> /api/jobs</a>
+            </aside>
+
+            <!-- Main Documentation Content -->
+            <main class="docs-main">
+                <!-- Quick Start Section -->
+                <section id="quickstart" class="glass-card api-card">
+                    <h2 style="font-size: 20px; color: #fff; margin-bottom: 8px;">🚀 Quick Start Guide</h2>
+                    <p style="color: var(--text-muted); font-size: 14px;">
+                        TaskPulse AI provides a comprehensive set of RESTful APIs for audio recording, speech-to-text transcription, automated meeting summary generation, task extraction, and AI execution audit logging.
+                    </p>
+                    <div style="margin-top: 14px; display: flex; gap: 16px;">
+                        <div style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.2); padding: 12px; border-radius: 10px; flex: 1;">
+                            <strong style="color: var(--accent-cyan); font-size: 13px;">Base Server URL:</strong>
+                            <div style="font-family: 'Fira Code', monospace; color: #fff; font-size: 13px; margin-top: 4px;">http://localhost:3000</div>
+                        </div>
+                        <div style="background: rgba(192,132,252,0.1); border: 1px solid rgba(192,132,252,0.2); padding: 12px; border-radius: 10px; flex: 1;">
+                            <strong style="color: var(--accent-purple); font-size: 13px;">Android Emulator Base Host:</strong>
+                            <div style="font-family: 'Fira Code', monospace; color: #fff; font-size: 13px; margin-top: 4px;">http://10.0.2.2:3000</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 1: Recording & Upload APIs -->
+                <h3 style="color: var(--accent-cyan); font-size: 16px; margin: 30px 0 14px 0;">🎙️ Recording & Audio Upload APIs</h3>
+
+                <!-- API Card: POST /api/android/upload -->
+                <section id="endpoint-android-upload" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-post">POST</span>
+                            <span class="api-path">/api/android/upload</span>
+                        </div>
+                        <span class="param-req">Recommended for Android & Mobile Apps</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">
+                        Accepts audio file uploads (`.wav`, `.m4a`, `.mp3`) recorded on mobile devices, transcribes speech with Whisper/SpeechService, and extracts meeting executive summary, items discussed, tasks, prompt payload, cURL command, and raw JSON response output.
+                    </p>
+
+                    <h4 style="font-size: 13px; color: #fff; margin-top: 14px;">Input Parameters (Multipart Form-Data):</h4>
+                    <table class="params-table">
+                        <thead>
+                            <tr><th>Field</th><th>Type</th><th>Presence</th><th>Description</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><span class="param-name">file</span></td><td><span class="param-type">File Blob</span></td><td><span class="param-req">Required</span></td><td>Audio recording file (.wav, .m4a, .mp3)</td></tr>
+                            <tr><td><span class="param-name">meeting_title</span></td><td><span class="param-type">String</span></td><td><span class="param-opt">Optional</span></td><td>Title of meeting session (Default: "Android Recorded Session")</td></tr>
+                            <tr><td><span class="param-name">target_language</span></td><td><span class="param-type">String</span></td><td><span class="param-opt">Optional</span></td><td>Target language for summary & tasks (Default: "English")</td></tr>
+                            <tr><td><span class="param-name">live_transcript</span></td><td><span class="param-type">String</span></td><td><span class="param-opt">Optional</span></td><td>Partial on-device live transcript text (if available)</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h4 style="font-size: 13px; color: #fff; margin-top: 14px;">Executable cURL Request Example:</h4>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X POST "http://localhost:3000/api/android/upload" \
+  -F "file=@meeting_recording.wav" \
+  -F "meeting_title=Android Mobile Strategy" \
+  -F "target_language=English" \
+  -F "live_transcript=Discussed mobile UI updates and release timeline."
+                    </div>
+
+                    <h4 style="font-size: 13px; color: #fff; margin-top: 14px;">Response JSON Format:</h4>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy JSON</button>
+{
+  "status": "success",
+  "meeting": {
+    "id": "m9x2k41b",
+    "title": "Android Mobile Strategy",
+    "language": "English",
+    "created_at": "2026-08-08 19:40:00",
+    "audio_url": "/recordings/web_rec_20260808194000.wav",
+    "audio_filename": "web_rec_20260808194000.wav",
+    "transcript": "Discussed mobile UI updates and release timeline.",
+    "summary": "Meeting Session Overview: Discussed mobile UI updates and release timeline.",
+    "items_discussed": [
+      { "topic": "Mobile UI", "details": "Updated layout with Play and Delete buttons", "category": "Design" }
+    ],
+    "task_count": 1,
+    "prompt": "Analyze meeting transcript for 'Android Mobile Strategy'...",
+    "curl_command": "curl -X POST \"http://localhost:3005/api/v1/ai/chat\" ...",
+    "response_raw": "{\n  \"summary\": \"Meeting Session Overview...\",\n  \"tasks\": 1\n}"
+  },
+  "tasks": [
+    {
+      "id": "t81a92",
+      "meeting_id": "m9x2k41b",
+      "title": "Release Mobile APK Build",
+      "assignee": "Alex",
+      "priority": "High",
+      "due_date": "Tomorrow",
+      "status": "todo"
+    }
+  ]
+}
+                    </div>
+                </section>
+
+                <!-- API Card: POST /api/record/upload -->
+                <section id="endpoint-record-upload" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-post">POST</span>
+                            <span class="api-path">/api/record/upload</span>
+                        </div>
+                        <span class="param-opt">Standard Audio Upload Alias</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">
+                        Generic alias for uploading recorded audio blobs. Processes audio, transcribes speech, extracts summary and action items.
+                    </p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X POST "http://localhost:3000/api/record/upload" \
+  -F "file=@audio_session.wav" \
+  -F "meeting_title=Team Sync Notes"
+                    </div>
+                </section>
+
+                <!-- API Card: POST /api/transcribe/text -->
+                <section id="endpoint-transcribe-text" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-post">POST</span>
+                            <span class="api-path">/api/transcribe/text</span>
+                        </div>
+                        <span class="param-req">Text-Only AI Analysis</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">
+                        Directly accepts raw text transcripts without requiring audio files. Runs MeetingAnalyzer to extract executive summary, items discussed, tasks, prompt payload, cURL command, and raw response.
+                    </p>
+                    <h4 style="font-size: 13px; color: #fff; margin-top: 14px;">Executable cURL Request Example:</h4>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X POST "http://localhost:3000/api/transcribe/text" \
+  -d "text=John will deploy the Node server. Sarah will test the API endpoints." \
+  -d "meeting_title=Sprint Retro Notes" \
+  -d "target_language=English"
+                    </div>
+                </section>
+
+                <!-- SECTION 2: Server Recording Controls -->
+                <h3 style="color: var(--accent-cyan); font-size: 16px; margin: 30px 0 14px 0;">🎛️ Server Dual Recording Controls</h3>
+
+                <section id="endpoint-rec-start" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-post">POST</span>
+                            <span class="api-path">/api/record/start</span>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">Starts dual-channel hardware soundcard recording on the host server.</p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X POST "http://localhost:3000/api/record/start" \
+  -H "Content-Type: application/json" \
+  -d '{"meeting_title": "Live Server Session", "target_language": "English"}'
+                    </div>
+                </section>
+
+                <section id="endpoint-rec-status" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-get">GET</span>
+                            <span class="api-path">/api/record/status</span>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">Returns live soundcard volume levels, mic/speaker mute flags, and elapsed recording time.</p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X GET "http://localhost:3000/api/record/status"
+                    </div>
+                </section>
+
+                <!-- SECTION 3: Meetings & Tasks APIs -->
+                <h3 style="color: var(--accent-cyan); font-size: 16px; margin: 30px 0 14px 0;">📋 Meetings & Action Tasks APIs</h3>
+
+                <section id="endpoint-meetings-list" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-get">GET</span>
+                            <span class="api-path">/api/meetings</span>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">Returns array of all recorded & analyzed meeting sessions.</p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X GET "http://localhost:3000/api/meetings"
+                    </div>
+                </section>
+
+                <section id="endpoint-tasks-list" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-get">GET</span>
+                            <span class="api-path">/api/tasks</span>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">Returns array of extracted action tasks across all sessions.</p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X GET "http://localhost:3000/api/tasks"
+                    </div>
+                </section>
+
+                <section id="endpoint-logs-get" class="glass-card api-card">
+                    <div class="api-header">
+                        <div class="api-title-area">
+                            <span class="method-badge method-get">GET</span>
+                            <span class="api-path">/api/ai/logs</span>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 13px;">Returns raw AI execution logs including prompts sent, cURL commands, and raw JSON response output.</p>
+                    <div class="code-box">
+<button class="copy-btn" onclick="copyCode(this)">Copy cURL</button>
+curl -X GET "http://localhost:3000/api/ai/logs"
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function copyCode(btn) {
+            const codeBox = btn.parentElement;
+            const text = codeBox.innerText.replace("Copy cURL", "").replace("Copy JSON", "").trim();
+            navigator.clipboard.writeText(text);
+            btn.innerText = "Copied!";
+            setTimeout(() => { btn.innerText = btn.innerText.includes("JSON") ? "Copy JSON" : "Copy cURL"; }, 2000);
+        }
+
+        // Quick Search Filter
+        document.getElementById('apiSearch').addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.api-card').forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(query) ? 'block' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
