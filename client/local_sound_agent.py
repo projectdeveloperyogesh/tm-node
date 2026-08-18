@@ -3,6 +3,7 @@ import sys
 import time
 import wave
 import json
+import io
 import threading
 import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -17,6 +18,17 @@ except ImportError:
     import sounddevice as sd
     import requests
 
+try:
+    import speech_recognition as sr
+    HAS_SR = True
+except ImportError:
+    os.system(f'"{sys.executable}" -m pip install SpeechRecognition')
+    try:
+        import speech_recognition as sr
+        HAS_SR = True
+    except ImportError:
+        HAS_SR = False
+
 LOCAL_PORT = 18514
 
 class AgentState:
@@ -24,6 +36,7 @@ class AgentState:
         self.is_recording = False
         self.is_paused = False
         self.audio_frames = []
+        self.live_transcript = []
         self.sample_rate = 16000
         self.channels = 2
         self.mic_level = 0
@@ -63,6 +76,54 @@ def audio_record_loop():
         print(f"[LocalSoundAgent Error] Audio stream capture error: {e}")
         with agent_state.lock:
             agent_state.is_recording = False
+
+def live_transcription_loop():
+    global agent_state
+    if not HAS_SR:
+        return
+
+    recognizer = sr.Recognizer()
+    last_processed_idx = 0
+
+    while True:
+        time.sleep(3)
+        with agent_state.lock:
+            if not agent_state.is_recording:
+                break
+            if agent_state.is_paused or len(agent_state.audio_frames) <= last_processed_idx + 15:
+                continue
+            
+            recent_frames = list(agent_state.audio_frames[last_processed_idx:])
+            last_processed_idx = len(agent_state.audio_frames)
+            elapsed = agent_state.elapsed_seconds
+
+        try:
+            audio_data = np.concatenate(recent_frames, axis=0)
+            int_data = (audio_data * 32767).astype(np.int16)
+            
+            buf = io.BytesIO()
+            with wave.open(buf, 'wb') as wf:
+                wf.setnchannels(agent_state.channels)
+                wf.setsampwidth(2)
+                wf.setframerate(agent_state.sample_rate)
+                wf.writeframes(int_data.tobytes())
+            buf.seek(0)
+
+            with sr.AudioFile(buf) as source:
+                audio = recognizer.record(source)
+
+            text = recognizer.recognize_google(audio, language="en-US")
+            if text and text.strip():
+                time_str = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
+                with agent_state.lock:
+                    agent_state.live_transcript.append({
+                        "start": time_str,
+                        "speaker": "Live Speaker",
+                        "text": text.strip()
+                    })
+                print(f"[Live Speech Stream] [{time_str}] {text.strip()}")
+        except Exception:
+            pass
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
@@ -115,7 +176,8 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     "mic_level": agent_state.mic_level,
                     "speaker_level": agent_state.speaker_level,
                     "elapsed_seconds": agent_state.elapsed_seconds,
-                    "meeting_title": agent_state.meeting_title
+                    "meeting_title": agent_state.meeting_title,
+                    "live_transcript": list(agent_state.live_transcript)
                 })
         else:
             self._json_response(404, {"error": "Endpoint not found"})
@@ -139,6 +201,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 agent_state.is_recording = True
                 agent_state.is_paused = False
                 agent_state.audio_frames = []
+                agent_state.live_transcript = []
                 agent_state.start_time = time.time()
                 agent_state.elapsed_seconds = 0
                 agent_state.server_url = post_data.get("server_url", "http://localhost:3000").rstrip("/")
@@ -146,7 +209,9 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 agent_state.target_language = post_data.get("target_language", "English")
 
             threading.Thread(target=audio_record_loop, daemon=True).start()
-            print(f"[LocalSoundAgent] Started recording for session '{agent_state.meeting_title}' target server: {agent_state.server_url}")
+            threading.Thread(target=live_transcription_loop, daemon=True).start()
+
+            print(f"[LocalSoundAgent] Started live recording & speech stream for session '{agent_state.meeting_title}' target server: {agent_state.server_url}")
             self._json_response(200, {"status": "recording_started", "message": "Local soundcard recording started."})
 
         elif self.path == "/pause":
@@ -168,6 +233,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 server_url = agent_state.server_url
                 meeting_title = agent_state.meeting_title
                 target_language = agent_state.target_language
+                live_text = " ".join([t["text"] for t in agent_state.live_transcript])
 
             print(f"[LocalSoundAgent] Stopping recording. Processing {len(frames_to_process)} audio chunks...")
 
@@ -186,7 +252,6 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     wf.setframerate(agent_state.sample_rate)
                     wf.writeframes(int_data.tobytes())
 
-                # Post WAV file directly to the remote Cloud Server!
                 upload_endpoint = f"{server_url}/api/android/upload"
                 print(f"[LocalSoundAgent] Uploading recording WAV to remote cloud server: {upload_endpoint}")
 
@@ -195,7 +260,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     payload = {
                         'meeting_title': meeting_title,
                         'target_language': target_language,
-                        'live_transcript': 'Recorded by TaskPulse Local Desktop Agent (WASAPI Mic + Speaker Loopback).'
+                        'live_transcript': live_text or 'Recorded by TaskPulse Local Desktop Agent (WASAPI Mic + Speaker Loopback).'
                     }
                     res = requests.post(upload_endpoint, files=files, data=payload, timeout=120)
 
@@ -222,7 +287,7 @@ def main():
     print("=" * 65)
     print(f" 🟢 TaskPulse Local Desktop Soundcard Agent Running")
     print(f" 📡 Local REST Agent Listening on: http://127.0.0.1:{LOCAL_PORT}")
-    print(f" 🎙️ Enables Remote Web Server to capture local PC Mic & Speakers")
+    print(f" 🎙️ Live Speech Stream Enabled (Real-time Speech Recognition)")
     print("=" * 65)
     try:
         server.serve_forever()
