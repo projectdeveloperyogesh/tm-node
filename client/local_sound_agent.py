@@ -9,25 +9,19 @@ import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
-try:
-    import sounddevice as sd
-    import requests
-except ImportError:
-    print("Installing missing dependencies (sounddevice, numpy, requests)...")
-    os.system(f'"{sys.executable}" -m pip install sounddevice numpy requests')
-    import sounddevice as sd
-    import requests
+# Add root node directory to sys.path to access audio_recorder
+CLIENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(CLIENT_DIR)
+sys.path.append(PARENT_DIR)
 
 try:
-    import speech_recognition as sr
-    HAS_SR = True
-except ImportError:
-    os.system(f'"{sys.executable}" -m pip install SpeechRecognition')
-    try:
-        import speech_recognition as sr
-        HAS_SR = True
-    except ImportError:
-        HAS_SR = False
+    import requests
+    from audio_recorder import DualAudioRecorder
+    HAS_RECORDER = True
+except Exception as imp_err:
+    print(f"[LocalSoundAgent Warning] DualAudioRecorder import notice: {imp_err}")
+    HAS_RECORDER = False
+    import requests
 
 LOCAL_PORT = 18514
 
@@ -35,98 +29,15 @@ class AgentState:
     def __init__(self):
         self.is_recording = False
         self.is_paused = False
-        self.audio_frames = []
-        self.live_transcript = []
-        self.sample_rate = 16000
-        self.channels = 2
-        self.mic_level = 0
-        self.speaker_level = 0
-        self.start_time = 0
-        self.elapsed_seconds = 0
+        self.recorder = DualAudioRecorder(output_dir=os.path.join(CLIENT_DIR, "temp_recordings")) if HAS_RECORDER else None
         self.server_url = "http://localhost:3000"
-        self.meeting_title = "Desktop Meeting Session"
+        self.meeting_title = "Desktop Recorded Meeting"
         self.target_language = "English"
         self.lock = threading.Lock()
 
 agent_state = AgentState()
 
-def audio_record_loop():
-    global agent_state
-
-    def callback(indata, frames, time_info, status):
-        with agent_state.lock:
-            if agent_state.is_recording and not agent_state.is_paused:
-                agent_state.audio_frames.append(indata.copy())
-                # Compute RMS decibel levels for web visualizer
-                rms = np.sqrt(np.mean(indata**2))
-                level = min(100, int(rms * 300))
-                agent_state.mic_level = level
-                agent_state.speaker_level = int(level * 0.8)
-
-    try:
-        with sd.InputStream(samplerate=agent_state.sample_rate, channels=agent_state.channels, callback=callback):
-            while True:
-                with agent_state.lock:
-                    if not agent_state.is_recording:
-                        break
-                    if not agent_state.is_paused:
-                        agent_state.elapsed_seconds = int(time.time() - agent_state.start_time)
-                time.sleep(0.2)
-    except Exception as e:
-        print(f"[LocalSoundAgent Error] Audio stream capture error: {e}")
-        with agent_state.lock:
-            agent_state.is_recording = False
-
-def live_transcription_loop():
-    global agent_state
-    if not HAS_SR:
-        return
-
-    recognizer = sr.Recognizer()
-    last_processed_idx = 0
-
-    while True:
-        time.sleep(3)
-        with agent_state.lock:
-            if not agent_state.is_recording:
-                break
-            if agent_state.is_paused or len(agent_state.audio_frames) <= last_processed_idx + 15:
-                continue
-            
-            recent_frames = list(agent_state.audio_frames[last_processed_idx:])
-            last_processed_idx = len(agent_state.audio_frames)
-            elapsed = agent_state.elapsed_seconds
-
-        try:
-            audio_data = np.concatenate(recent_frames, axis=0)
-            int_data = (audio_data * 32767).astype(np.int16)
-            
-            buf = io.BytesIO()
-            with wave.open(buf, 'wb') as wf:
-                wf.setnchannels(agent_state.channels)
-                wf.setsampwidth(2)
-                wf.setframerate(agent_state.sample_rate)
-                wf.writeframes(int_data.tobytes())
-            buf.seek(0)
-
-            with sr.AudioFile(buf) as source:
-                audio = recognizer.record(source)
-
-            text = recognizer.recognize_google(audio, language="en-US")
-            if text and text.strip():
-                time_str = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
-                with agent_state.lock:
-                    agent_state.live_transcript.append({
-                        "start": time_str,
-                        "speaker": "Live Speaker",
-                        "text": text.strip()
-                    })
-                print(f"[Live Speech Stream] [{time_str}] {text.strip()}")
-        except Exception:
-            pass
-
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    """Handle requests in a separate thread."""
     daemon_threads = True
 
 class AgentRequestHandler(BaseHTTPRequestHandler):
@@ -149,35 +60,31 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
+            is_rec = agent_state.recorder.is_recording if agent_state.recorder else False
             self._json_response(200, {
                 "status": "running",
                 "agent": "TaskPulse Local Sound Agent v1.0",
                 "port": LOCAL_PORT,
-                "is_recording": agent_state.is_recording
+                "is_recording": is_rec
             })
         elif self.path == "/devices":
-            try:
-                devices = sd.query_devices()
-                mics = []
-                speakers = []
-                for i, d in enumerate(devices):
-                    if d.get('max_input_channels', 0) > 0:
-                        mics.append({"id": i, "name": d.get('name')})
-                    if d.get('max_output_channels', 0) > 0:
-                        speakers.append({"id": i, "name": d.get('name')})
-                self._json_response(200, {"microphones": mics, "speakers": speakers})
-            except Exception as e:
-                self._json_response(500, {"error": str(e)})
+            if agent_state.recorder:
+                self._json_response(200, agent_state.recorder.get_audio_devices())
+            else:
+                self._json_response(200, {"microphones": [], "speakers": []})
         elif self.path == "/status":
-            with agent_state.lock:
+            if agent_state.recorder:
+                rec_status = agent_state.recorder.get_status()
+                rec_status["meeting_title"] = agent_state.meeting_title
+                self._json_response(200, rec_status)
+            else:
                 self._json_response(200, {
-                    "is_recording": agent_state.is_recording,
-                    "is_paused": agent_state.is_paused,
-                    "mic_level": agent_state.mic_level,
-                    "speaker_level": agent_state.speaker_level,
-                    "elapsed_seconds": agent_state.elapsed_seconds,
-                    "meeting_title": agent_state.meeting_title,
-                    "live_transcript": list(agent_state.live_transcript)
+                    "is_recording": False,
+                    "is_paused": False,
+                    "mic_level": 0,
+                    "speaker_level": 0,
+                    "elapsed_seconds": 0,
+                    "live_transcript": []
                 })
         else:
             self._json_response(404, {"error": "Endpoint not found"})
@@ -194,75 +101,65 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
 
         if self.path == "/start":
             with agent_state.lock:
-                if agent_state.is_recording:
+                if agent_state.recorder and agent_state.recorder.is_recording:
                     self._json_response(200, {"status": "already_recording", "message": "Local agent is already recording."})
                     return
 
-                agent_state.is_recording = True
-                agent_state.is_paused = False
-                agent_state.audio_frames = []
-                agent_state.live_transcript = []
-                agent_state.start_time = time.time()
-                agent_state.elapsed_seconds = 0
                 agent_state.server_url = post_data.get("server_url", "http://localhost:3000").rstrip("/")
                 agent_state.meeting_title = post_data.get("meeting_title", "Desktop Recorded Meeting")
                 agent_state.target_language = post_data.get("target_language", "English")
 
-            threading.Thread(target=audio_record_loop, daemon=True).start()
-            threading.Thread(target=live_transcription_loop, daemon=True).start()
+                mic_id = post_data.get("mic_id")
+                speaker_id = post_data.get("speaker_id")
 
-            print(f"[LocalSoundAgent] Started live recording & speech stream for session '{agent_state.meeting_title}' target server: {agent_state.server_url}")
-            self._json_response(200, {"status": "recording_started", "message": "Local soundcard recording started."})
+            if agent_state.recorder:
+                start_res = agent_state.recorder.start_recording(mic_id=mic_id, speaker_id=speaker_id)
+                print(f"[LocalSoundAgent] Started WASAPI soundcard capture (Mic + Speaker Loopback) for session '{agent_state.meeting_title}' target server: {agent_state.server_url}")
+                self._json_response(200, start_res)
+            else:
+                self._json_response(500, {"error": "DualAudioRecorder unavailable on local PC."})
 
         elif self.path == "/pause":
-            with agent_state.lock:
-                if not agent_state.is_recording:
-                    self._json_response(400, {"error": "Not currently recording"})
-                    return
-                agent_state.is_paused = not agent_state.is_paused
-                status_str = "paused" if agent_state.is_paused else "resumed"
-            self._json_response(200, {"status": status_str, "is_paused": agent_state.is_paused})
+            if agent_state.recorder and agent_state.recorder.is_recording:
+                if agent_state.recorder.is_paused:
+                    res = agent_state.recorder.resume_recording()
+                else:
+                    res = agent_state.recorder.pause_recording()
+                self._json_response(200, res)
+            else:
+                self._json_response(400, {"error": "Not currently recording"})
 
         elif self.path == "/stop":
+            if not agent_state.recorder or not agent_state.recorder.is_recording:
+                self._json_response(400, {"error": "Not currently recording"})
+                return
+
             with agent_state.lock:
-                if not agent_state.is_recording:
-                    self._json_response(400, {"error": "Not currently recording"})
-                    return
-                agent_state.is_recording = False
-                frames_to_process = list(agent_state.audio_frames)
                 server_url = agent_state.server_url
                 meeting_title = agent_state.meeting_title
                 target_language = agent_state.target_language
-                live_text = " ".join([t["text"] for t in agent_state.live_transcript])
+                live_text = agent_state.recorder.get_full_transcript_text()
 
-            print(f"[LocalSoundAgent] Stopping recording. Processing {len(frames_to_process)} audio chunks...")
+            print(f"[LocalSoundAgent] Stopping WASAPI recording. Compiling mic + speaker audio...")
+            stop_info = agent_state.recorder.stop_recording()
+            wav_path = stop_info.get("filename")
 
-            if not frames_to_process:
-                self._json_response(400, {"error": "No audio data recorded."})
+            if not wav_path or not os.path.exists(wav_path):
+                self._json_response(400, {"error": "No audio file generated."})
                 return
 
-            wav_path = "temp_local_agent_recording.wav"
             try:
-                audio_data = np.concatenate(frames_to_process, axis=0)
-                int_data = (audio_data * 32767).astype(np.int16)
-
-                with wave.open(wav_path, 'wb') as wf:
-                    wf.setnchannels(agent_state.channels)
-                    wf.setsampwidth(2)
-                    wf.setframerate(agent_state.sample_rate)
-                    wf.writeframes(int_data.tobytes())
-
                 upload_endpoint = f"{server_url}/api/android/upload"
-                print(f"[LocalSoundAgent] Uploading recording WAV to remote cloud server: {upload_endpoint}")
+                print(f"[LocalSoundAgent] Uploading dual soundcard WAV ({os.path.getsize(wav_path)} bytes) to remote cloud server: {upload_endpoint}")
 
                 with open(wav_path, 'rb') as f:
-                    files = {'file': (wav_path, f, 'audio/wav')}
+                    files = {'file': (os.path.basename(wav_path), f, 'audio/wav')}
                     payload = {
                         'meeting_title': meeting_title,
                         'target_language': target_language,
                         'live_transcript': live_text or 'Recorded by TaskPulse Local Desktop Agent (WASAPI Mic + Speaker Loopback).'
                     }
-                    res = requests.post(upload_endpoint, files=files, data=payload, timeout=120)
+                    res = requests.post(upload_endpoint, files=files, data=payload, timeout=180)
 
                 if res.status_code == 200:
                     server_data = res.json()
@@ -276,7 +173,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 print(f"[LocalSoundAgent Error] Failed to upload to remote server: {e}")
                 self._json_response(500, {"error": f"Failed to upload audio to remote server: {str(e)}"})
             finally:
-                if os.path.exists(wav_path):
+                if wav_path and os.path.exists(wav_path):
                     try: os.remove(wav_path)
                     except: pass
         else:
@@ -287,7 +184,8 @@ def main():
     print("=" * 65)
     print(f" 🟢 TaskPulse Local Desktop Soundcard Agent Running")
     print(f" 📡 Local REST Agent Listening on: http://127.0.0.1:{LOCAL_PORT}")
-    print(f" 🎙️ Live Speech Stream Enabled (Real-time Speech Recognition)")
+    print(f" 🔊 WASAPI Speaker Loopback Capture ENABLED (Captures Zoom/Meet/Teams)")
+    print(f" 🎙️ Microphone Array Capture ENABLED (Captures Your Voice)")
     print("=" * 65)
     try:
         server.serve_forever()
