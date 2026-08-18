@@ -91,10 +91,13 @@
                         </div>
 
                         <div class="form-group margin-top-10">
-                            <label><i data-lucide="radio"></i> Active Recording Engine</label>
-                            <div class="engine-badge-box" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); padding: 10px 14px; border-radius: 10px; display: flex; align-items: center; gap: 8px;">
-                                <i data-lucide="cpu" style="color: var(--accent-cyan);"></i>
-                                <span style="font-size: 13px; font-weight: 600; color: #fff;">💻 Desktop Dual Soundcard Recorder (WASAPI Mic + System Audio)</span>
+                            <label><i data-lucide="radio"></i> Active Soundcard Recording Connection</label>
+                            <div id="localAgentBadge" class="engine-badge-box" style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); padding: 10px 14px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i id="localAgentIcon" data-lucide="cpu" style="color: var(--accent-cyan);"></i>
+                                    <span id="localAgentText" style="font-size: 13px; font-weight: 600; color: #fff;">Detecting Local Soundcard Agent (127.0.0.1:18514)...</span>
+                                </div>
+                                <a id="localAgentHelpBtn" href="/client/start_local_agent.bat" download style="display: none; font-size: 11px; color: var(--accent-pink); text-decoration: underline;">Download Agent Launcher</a>
                             </div>
                             <select id="recordingEngineSelect" style="display: none;">
                                 <option value="desktop" selected>Desktop</option>

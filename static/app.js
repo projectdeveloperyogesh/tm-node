@@ -89,6 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
+    const LOCAL_AGENT_URL = "http://127.0.0.1:18514";
+
     // --- Initialization ---
     init();
 
@@ -107,6 +109,43 @@ document.addEventListener('DOMContentLoaded', () => {
         setupAiLogsEvents();
         initCanvasWaveform();
         loadAiLogs();
+
+        checkLocalAgentHealth();
+        setInterval(checkLocalAgentHealth, 4000);
+    }
+
+    async function checkLocalAgentHealth() {
+        const badge = document.getElementById('localAgentBadge');
+        const icon = document.getElementById('localAgentIcon');
+        const text = document.getElementById('localAgentText');
+        const helpBtn = document.getElementById('localAgentHelpBtn');
+        if (!badge || !text) return;
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(`${LOCAL_AGENT_URL}/health`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            const data = await res.json();
+
+            if (data.status === 'running') {
+                state.isLocalAgentOnline = true;
+                badge.style.background = 'rgba(52, 211, 153, 0.12)';
+                badge.style.borderColor = 'rgba(52, 211, 153, 0.3)';
+                if (icon) icon.style.color = '#34d399';
+                text.innerHTML = '🟢 Local Soundcard Agent Connected (<span style="font-family: monospace;">127.0.0.1:18514</span>)';
+                if (helpBtn) helpBtn.style.display = 'none';
+            } else {
+                throw new Error('Agent offline');
+            }
+        } catch (e) {
+            state.isLocalAgentOnline = false;
+            badge.style.background = 'rgba(248, 113, 113, 0.12)';
+            badge.style.borderColor = 'rgba(248, 113, 113, 0.3)';
+            if (icon) icon.style.color = '#f87171';
+            text.innerHTML = '🔴 Local Soundcard Agent Offline (<span style="font-family: monospace;">127.0.0.1:18514</span>)';
+            if (helpBtn) helpBtn.style.display = 'inline-block';
+        }
     }
 
     // --- Navigation Tabs ---
@@ -440,54 +479,76 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         startRecordBtn.addEventListener('click', async () => {
+            const title = meetingTitleInput.value.trim() || 'Live Recorded Meeting';
+            const lang = recorderLanguageSelect ? recorderLanguageSelect.value : 'English';
+            const serverUrl = window.location.origin;
+
+            if (state.isLocalAgentOnline) {
+                try {
+                    const res = await fetch(`${LOCAL_AGENT_URL}/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            server_url: serverUrl,
+                            meeting_title: title,
+                            target_language: lang
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'recording_started' || data.status === 'already_recording') {
+                        state.isRecording = true;
+                        state.isPaused = false;
+                        startRecordBtn.disabled = true;
+                        pauseRecordBtn.disabled = false;
+                        stopRecordBtn.disabled = false;
+                        timerStatusLabel.textContent = 'Recording Live (Local Soundcard Agent)';
+                        recordingStatusPill.textContent = 'Recording';
+                        startStatusPolling();
+                        lucide.createIcons();
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('Local agent start notice:', err);
+                }
+            }
+
             const formData = new FormData();
             formData.append('mic_id', micSelect.value || '');
             formData.append('speaker_id', speakerSelect.value || '');
+            formData.append('meeting_title', title);
+            formData.append('target_language', lang);
 
             try {
-                const res = await fetch('/api/record/start', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('/api/record/start', { method: 'POST', body: formData });
                 const data = await res.json();
-
                 if (data.status === 'recording_started' || data.status === 'already_recording') {
                     state.isRecording = true;
                     state.isPaused = false;
-                    state.isMicMuted = false;
-                    state.isSpeakerMuted = false;
-
-                    if (muteMicBtn) {
-                        muteMicBtn.innerHTML = '<i data-lucide="mic"></i> Mic On';
-                        muteMicBtn.classList.remove('btn-danger');
-                        muteMicBtn.classList.add('btn-secondary');
-                    }
-                    if (muteSpeakerBtn) {
-                        muteSpeakerBtn.innerHTML = '<i data-lucide="volume-2"></i> Speaker On';
-                        muteSpeakerBtn.classList.remove('btn-danger');
-                        muteSpeakerBtn.classList.add('btn-secondary');
-                    }
-
                     startRecordBtn.disabled = true;
                     pauseRecordBtn.disabled = false;
                     stopRecordBtn.disabled = false;
-                    timerStatusLabel.textContent = 'Recording Live (Desktop Soundcard)';
+                    timerStatusLabel.textContent = 'Recording Live (Server Soundcard)';
                     recordingStatusPill.textContent = 'Recording';
-
                     startStatusPolling();
                     lucide.createIcons();
                 } else {
-                    alert('🎙️ Desktop Dual Soundcard Recorder Notice: ' + (data.message || 'Please check microphone & speaker permissions.'));
+                    alert('🎙️ Soundcard Recording Notice: ' + (data.message || 'Please launch start_local_agent.bat on your PC.'));
                 }
             } catch (e) {
-                alert('Failed to start desktop recording: ' + (e.message || e));
+                alert('Failed to start recording: ' + (e.message || e));
             }
         });
 
         pauseRecordBtn.addEventListener('click', async () => {
             try {
-                const res = await fetch('/api/record/pause', { method: 'POST' });
-                const data = await res.json();
+                let data = null;
+                if (state.isLocalAgentOnline) {
+                    const res = await fetch(`${LOCAL_AGENT_URL}/pause`, { method: 'POST' });
+                    data = await res.json();
+                } else {
+                    const res = await fetch('/api/record/pause', { method: 'POST' });
+                    data = await res.json();
+                }
 
                 if (data.status === 'paused') {
                     state.isPaused = true;
@@ -564,18 +625,61 @@ document.addEventListener('DOMContentLoaded', () => {
             const lang = recorderLanguageSelect ? recorderLanguageSelect.value : 'English';
 
             stopRecordBtn.disabled = true;
-            timerStatusLabel.textContent = 'Transcribing & Processing...';
+            timerStatusLabel.textContent = 'Transcribing & Processing by Cloud AI...';
 
             try {
-                const formData = new FormData();
-                formData.append('meeting_title', title);
-                formData.append('target_language', lang);
+                let data = null;
+                if (state.isLocalAgentOnline) {
+                    const res = await fetch(`${LOCAL_AGENT_URL}/stop`, { method: 'POST' });
+                    data = await res.json();
+                } else {
+                    const formData = new FormData();
+                    formData.append('meeting_title', title);
+                    formData.append('target_language', lang);
 
-                const res = await fetch('/api/record/stop', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
+                    const res = await fetch('/api/record/stop', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    data = await res.json();
+                }
+
+                state.isRecording = false;
+                state.isPaused = false;
+                stopStatusPolling();
+
+                startRecordBtn.disabled = false;
+                pauseRecordBtn.disabled = true;
+                pauseRecordBtn.innerHTML = '<i data-lucide="pause"></i> Pause';
+                recordingTimer.textContent = '00:00:00';
+                timerStatusLabel.textContent = 'Standby';
+                recordingStatusPill.textContent = 'Ready';
+                micLevelBar.style.width = '0%';
+                speakerLevelBar.style.width = '0%';
+                micLevelVal.textContent = '0%';
+                speakerLevelVal.textContent = '0%';
+
+                if (data && (data.status === 'success' || data.meeting)) {
+                    const meeting = data.meeting || data;
+                    if (meeting.id) {
+                        state.currentMeetingId = meeting.id;
+                        await loadMeetings();
+                        await loadTasks();
+                        switchMeetingSession(meeting.id);
+                        activateTab('insightsTab');
+                    }
+                } else if (data && data.error) {
+                    alert('Error processing recording: ' + data.error);
+                    startRecordBtn.disabled = false;
+                }
+            } catch (e) {
+                alert('Error processing recording: ' + (e.message || e));
+                startRecordBtn.disabled = false;
+                stopRecordBtn.disabled = false;
+                timerStatusLabel.textContent = 'Standby';
+            }
+            lucide.createIcons();
+        });
 
                 state.isRecording = false;
                 state.isPaused = false;
@@ -638,30 +742,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!state.isRecording) return;
 
             try {
-                const res = await fetch('/api/record/status');
-                const data = await res.json();
+                let data = null;
+                if (state.isLocalAgentOnline) {
+                    const res = await fetch(`${LOCAL_AGENT_URL}/status`);
+                    data = await res.json();
+                } else {
+                    const res = await fetch('/api/record/status');
+                    data = await res.json();
+                }
 
-                // Format time
-                const secs = data.elapsed_seconds || 0;
-                const hrs = String(Math.floor(secs / 3600)).padStart(2, '0');
-                const mins = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-                const scs = String(secs % 60).padStart(2, '0');
-                recordingTimer.textContent = `${hrs}:${mins}:${scs}`;
+                if (data) {
+                    const secs = data.elapsed_seconds || 0;
+                    const hrs = String(Math.floor(secs / 3600)).padStart(2, '0');
+                    const mins = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+                    const scs = String(secs % 60).padStart(2, '0');
+                    recordingTimer.textContent = `${hrs}:${mins}:${scs}`;
 
-                // Update sound meters (0% - 100% percentage scaling)
-                const rawMic = data.mic_level || 0;
-                const rawSpk = data.speaker_level || 0;
+                    const rawMic = data.mic_level || 0;
+                    const rawSpk = data.speaker_level || 0;
 
-                const micLvl = Math.min(100, Math.max(0, Math.round(rawMic)));
-                const spkLvl = Math.min(100, Math.max(0, Math.round(rawSpk)));
+                    const micLvl = Math.min(100, Math.max(0, Math.round(rawMic)));
+                    const spkLvl = Math.min(100, Math.max(0, Math.round(rawSpk)));
 
-                micLevelBar.style.width = `${micLvl}%`;
-                micLevelVal.textContent = `${micLvl}%`;
+                    micLevelBar.style.width = `${micLvl}%`;
+                    speakerLevelBar.style.width = `${spkLvl}%`;
+                    micLevelVal.textContent = `${micLvl}%`;
+                    speakerLevelVal.textContent = `${spkLvl}%`;
 
-                speakerLevelBar.style.width = `${spkLvl}%`;
-                speakerLevelVal.textContent = `${spkLvl}%`;
-
-                updateWaveform(micLvl, spkLvl);
+                    updateWaveform(micLvl, spkLvl);
+                }
 
                 // Update Live Transcript Stream
                 if (data.live_transcript && data.live_transcript.length > 0) {
