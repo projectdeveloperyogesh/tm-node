@@ -680,59 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             lucide.createIcons();
         });
-
-                state.isRecording = false;
-                state.isPaused = false;
-                stopStatusPolling();
-
-                startRecordBtn.disabled = false;
-                pauseRecordBtn.disabled = true;
-                pauseRecordBtn.innerHTML = '<i data-lucide="pause"></i> Pause';
-                recordingTimer.textContent = '00:00:00';
-                timerStatusLabel.textContent = 'Standby';
-                recordingStatusPill.textContent = 'Ready';
-                micLevelBar.style.width = '0%';
-                speakerLevelBar.style.width = '0%';
-                micLevelVal.textContent = '0%';
-                speakerLevelVal.textContent = '0%';
-
-                if (data && (data.status === 'success' || data.status === 'background_processing')) {
-                    if (data.status === 'background_processing') {
-                        const bgJobsModal = document.getElementById('bgJobsModal');
-                        if (bgJobsModal) bgJobsModal.classList.remove('hidden');
-                        startJobsPolling();
-                    } else if (data.meeting) {
-                        state.currentMeetingId = data.meeting.id;
-                        await loadMeetings();
-                        await loadTasks();
-                        switchMeetingSession(data.meeting.id);
-                        activateTab('insightsTab');
-                    }
-                } else if (data && data.detail) {
-                    if (data.detail.includes('ECONNRESET') || data.detail.includes('reset') || data.detail.includes('timed out')) {
-                        const bgJobsModal = document.getElementById('bgJobsModal');
-                        if (bgJobsModal) bgJobsModal.classList.remove('hidden');
-                        startJobsPolling();
-                    } else {
-                        alert('Error processing recording: ' + data.detail);
-                        startRecordBtn.disabled = false;
-                    }
-                }
-            } catch (e) {
-                const errStr = (e.message || String(e)).toLowerCase();
-                if (errStr.includes('econnreset') || errStr.includes('reset') || errStr.includes('failed to fetch') || errStr.includes('networkerror')) {
-                    const bgJobsModal = document.getElementById('bgJobsModal');
-                    if (bgJobsModal) bgJobsModal.classList.remove('hidden');
-                    startJobsPolling();
-                } else {
-                    alert('Error processing recording: ' + (e.message || e));
-                    startRecordBtn.disabled = false;
-                    stopRecordBtn.disabled = false;
-                    timerStatusLabel.textContent = 'Standby';
-                }
-            }
-            lucide.createIcons();
-        });
     }
 
     function startStatusPolling() {
