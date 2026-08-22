@@ -605,17 +605,17 @@ class DualAudioRecorder:
         spk_16k_pcm = resample_pcm(spk_raw_pcm, spk_rate, target_rate=target_rate, channels=spk_ch)
         spk_arr = np.frombuffer(spk_16k_pcm, dtype=np.int16) if spk_16k_pcm else np.array([], dtype=np.int16)
 
-        # Mix Mic and Speaker arrays sample-by-sample
+        # Mix Mic and Speaker arrays sample-by-sample with 2.5x gain boost for system speaker audio
         if len(mic_arr) > 0 and len(spk_arr) > 0:
             max_len = max(len(mic_arr), len(spk_arr))
             mixed = np.zeros(max_len, dtype=np.int32)
             mixed[:len(mic_arr)] += mic_arr.astype(np.int32)
-            mixed[:len(spk_arr)] += spk_arr.astype(np.int32)
+            mixed[:len(spk_arr)] += (spk_arr.astype(np.float32) * 2.5).astype(np.int32)
             mixed_audio = np.clip(mixed, -32768, 32767).astype(np.int16)
         elif len(mic_arr) > 0:
             mixed_audio = mic_arr
         elif len(spk_arr) > 0:
-            mixed_audio = spk_arr
+            mixed_audio = np.clip(spk_arr.astype(np.float32) * 2.5, -32768, 32767).astype(np.int16)
         else:
             mixed_audio = np.zeros(16000 * 2, dtype=np.int16)
 

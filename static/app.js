@@ -491,7 +491,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         body: JSON.stringify({
                             server_url: serverUrl,
                             meeting_title: title,
-                            target_language: lang
+                            target_language: lang,
+                            mic_id: micSelect.value || '',
+                            speaker_id: speakerSelect.value || ''
                         })
                     });
                     const data = await res.json();
