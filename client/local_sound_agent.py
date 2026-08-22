@@ -155,7 +155,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                 wav_path = None
                 try:
                     stop_info = agent_state.recorder.stop_recording()
-                    wav_path = stop_info.get("filename")
+                    wav_path = stop_info.get("filepath") or stop_info.get("filename")
                 except Exception as rec_err:
                     print(f"[LocalSoundAgent Error] stop_recording exception: {rec_err}")
                     self._json_response(500, {"error": f"Failed to finalize recording: {str(rec_err)}"})
