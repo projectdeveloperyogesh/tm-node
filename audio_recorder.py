@@ -667,3 +667,8 @@ class DualAudioRecorder:
             "live_transcript": self.live_transcript,
             "current_filename": os.path.basename(self.current_filename) if self.current_filename else None
         }
+
+    def get_full_transcript_text(self):
+        if not self.live_transcript:
+            return ""
+        return " ".join([f"[{t.get('time', '')}] {t.get('speaker', '')}: {t.get('text', '')}" for t in self.live_transcript])

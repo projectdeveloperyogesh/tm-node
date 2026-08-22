@@ -149,7 +149,7 @@ class AgentRequestHandler(BaseHTTPRequestHandler):
                     server_url = agent_state.server_url
                     meeting_title = agent_state.meeting_title
                     target_language = agent_state.target_language
-                    live_text = agent_state.recorder.get_full_transcript_text()
+                    live_text = agent_state.recorder.get_full_transcript_text() if hasattr(agent_state.recorder, 'get_full_transcript_text') else ""
 
                 print(f"[LocalSoundAgent] Stopping WASAPI recording. Compiling mic + speaker audio...")
                 wav_path = None
