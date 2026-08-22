@@ -408,11 +408,19 @@ class MeetingAnalyzer {
 
             if (chatRes.ok) {
                 const chatData = await chatRes.json();
-                let reply = chatData.reply || "";
+                let reply = chatData.reply || chatData.response || chatData.content || chatData.message || chatData.data ||
+                    (chatData.choices && chatData.choices[0] && chatData.choices[0].message && chatData.choices[0].message.content) ||
+                    (chatData.candidates && chatData.candidates[0] && chatData.candidates[0].content && chatData.candidates[0].content.parts && chatData.candidates[0].content.parts[0].text) ||
+                    (typeof chatData === 'string' ? chatData : JSON.stringify(chatData));
 
                 let cleanJson = reply.trim();
                 if (cleanJson.includes("```")) {
                     cleanJson = cleanJson.replace(/^```(?:json)?\s*/gm, '').replace(/\s*```$/gm, '');
+                }
+
+                const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    cleanJson = jsonMatch[0];
                 }
 
                 const jsonPayloadStr = JSON.stringify(payload, null, 2);
@@ -420,7 +428,7 @@ class MeetingAnalyzer {
 
                 try {
                     const parsed = JSON.parse(cleanJson.trim());
-                    const enriched = this._enrichAnalysisOutput(parsed);
+                    const enriched = this._enrichAnalysisOutput(parsed, meetingTitle, targetLanguage);
                     enriched.transcript = parsed.transcript || transcriptText || `Audio recording analyzed for ${meetingTitle}.`;
                     enriched.prompt = prompt;
                     enriched.curl_command = curlCmd;
@@ -428,26 +436,37 @@ class MeetingAnalyzer {
                     this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", targetUrl, "POST", payload);
                     return enriched;
                 } catch (parseErr) {
+                    // Extract structured meeting items from plain AI text response
+                    const sumMatch = reply.match(/(?:Summary|Executive Summary|Executive Summary:)\s*\n?([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i);
+                    const extractedSummary = sumMatch ? sumMatch[1].trim() : reply.substring(0, 400).trim();
+
+                    const bulletLines = reply.match(/(?:[•\-\*\d+\.]\s*)([^\n]+)/g) || [];
+                    const items = bulletLines.slice(0, 6).map(b => ({
+                        topic: "Discussion Highlight",
+                        details: b.trim().replace(/^[•\-\*\d+\.]\s*/, ' • '),
+                        category: "Technical"
+                    }));
+
                     const fallbackRes = {
-                        summary: reply.substring(0, 500),
-                        items_discussed: [{ topic: "Meeting Notes", details: reply, category: "AI Notes" }],
+                        summary: extractedSummary || `Recorded meeting session for ${meetingTitle}.`,
+                        items_discussed: items.length > 0 ? items : [{ topic: "Meeting Notes", details: ` • ${reply.substring(0, 200)}`, category: "AI Notes" }],
                         tasks: [{
                             id: Math.random().toString(36).substring(2, 10),
-                            title: `Follow-up on ${meetingTitle}`,
-                            description: "Review generated meeting notes.",
+                            title: `Action Task: Follow-up on ${meetingTitle}`,
+                            description: "Review generated meeting AI notes and complete assigned action items.",
                             assignee: "Team",
                             priority: "Medium",
                             category: "Follow-up",
                             due_date: "Tomorrow",
                             status: "todo",
-                            subtasks: []
+                            subtasks: [{ id: "sub_1", title: "Review action items", completed: false }]
                         }],
                         transcript: transcriptText || reply,
                         prompt: prompt,
                         curl_command: curlCmd,
                         response_raw: reply
                     };
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "partial_json_fallback", targetUrl, "POST", payload);
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "formatted_text_fallback", targetUrl, "POST", payload);
                     return fallbackRes;
                 }
             }
