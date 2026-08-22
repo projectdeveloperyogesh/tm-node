@@ -436,37 +436,55 @@ class MeetingAnalyzer {
                     this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", targetUrl, "POST", payload);
                     return enriched;
                 } catch (parseErr) {
-                    // Extract structured meeting items from plain AI text response
-                    const sumMatch = reply.match(/(?:Summary|Executive Summary|Executive Summary:)\s*\n?([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i);
-                    const extractedSummary = sumMatch ? sumMatch[1].trim() : reply.substring(0, 400).trim();
+                    // Smart Section Parser for Yogesh Chat Markdown AI Responses
+                    const sections = reply.split(/###\s*\d*\.?\s*/);
+                    let summaryParts = [];
+                    let items = [];
 
-                    const bulletLines = reply.match(/(?:[•\-\*\d+\.]\s*)([^\n]+)/g) || [];
-                    const items = bulletLines.slice(0, 6).map(b => ({
-                        topic: "Discussion Highlight",
-                        details: b.trim().replace(/^[•\-\*\d+\.]\s*/, ' • '),
-                        category: "Technical"
-                    }));
+                    sections.forEach(sec => {
+                        const secClean = sec.strip ? sec.strip() : sec.trim();
+                        if (!secClean) return;
+                        const headerLine = secClean.split('\n')[0].replace(/\*\*/g, '').replace(/:/g, '').trim();
+
+                        if (/(conclusion|observation|summary|overview|recommendation)/i.test(headerLine)) {
+                            summaryParts.push(secClean);
+                        }
+
+                        const bullets = secClean.match(/(?:[\*\-\•]\s*)([^\n]+)/g) || [];
+                        bullets.forEach(b => {
+                            const bClean = b.replace(/[\*\`]/g, '').replace(/^[•\-\*\d+\.]\s*/, '').trim();
+                            if (bClean.length > 5) {
+                                items.push({
+                                    topic: headerLine.length < 40 ? headerLine : "Discussion Highlight",
+                                    details: ` • ${bClean}`,
+                                    category: "Technical"
+                                });
+                            }
+                        });
+                    });
+
+                    const fullSummary = summaryParts.length > 0 ? summaryParts.join('\n\n') : reply.substring(0, 500);
 
                     const fallbackRes = {
-                        summary: extractedSummary || `Recorded meeting session for ${meetingTitle}.`,
-                        items_discussed: items.length > 0 ? items : [{ topic: "Meeting Notes", details: ` • ${reply.substring(0, 200)}`, category: "AI Notes" }],
+                        summary: fullSummary || `Recorded meeting session for ${meetingTitle}.`,
+                        items_discussed: items.length > 0 ? items.slice(0, 10) : [{ topic: "Meeting Notes", details: ` • ${reply.substring(0, 200)}`, category: "AI Notes" }],
                         tasks: [{
                             id: Math.random().toString(36).substring(2, 10),
-                            title: `Action Task: Follow-up on ${meetingTitle}`,
-                            description: "Review generated meeting AI notes and complete assigned action items.",
+                            title: `Follow-up & Review: ${meetingTitle}`,
+                            description: "Review generated meeting transcript context and complete assigned action items.",
                             assignee: "Team",
                             priority: "Medium",
                             category: "Follow-up",
                             due_date: "Tomorrow",
                             status: "todo",
-                            subtasks: [{ id: "sub_1", title: "Review action items", completed: false }]
+                            subtasks: [{ id: "sub_1", title: "Review transcript context", completed: false }]
                         }],
                         transcript: transcriptText || reply,
                         prompt: prompt,
                         curl_command: curlCmd,
                         response_raw: reply
                     };
-                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "formatted_text_fallback", targetUrl, "POST", payload);
+                    this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, fallbackRes, 1500, "formatted_markdown_parsed", targetUrl, "POST", payload);
                     return fallbackRes;
                 }
             }
