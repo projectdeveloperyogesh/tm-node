@@ -360,12 +360,13 @@ class DualAudioRecorder:
             pass
 
     def _speaker_worker(self):
-        """Dedicated thread for WASAPI Loopback Speaker audio capture with multi-sample rate fallback."""
+        """Dedicated thread for WASAPI Loopback Speaker audio capture using callback stream & keepalive."""
         if self.speaker_device_index is None or self.pa is None:
             print("Speaker worker: No speaker device index set")
             return
 
         stream = None
+        silent_out_stream = None
         rate = 48000
         channels = 2
         chunk = 1024
@@ -377,6 +378,53 @@ class DualAudioRecorder:
         except Exception:
             dev_rate = 48000
             dev_ch = 2
+
+        # Open silent keepalive output stream on default speaker output so WASAPI loopback driver never suspends
+        try:
+            default_out_idx = None
+            try:
+                def_out_info = self.pa.get_default_output_device_info()
+                default_out_idx = def_out_info.get("index")
+            except Exception:
+                pass
+            
+            if default_out_idx is not None:
+                silent_out_stream = self.pa.open(
+                    format=pyaudio.paInt16,
+                    channels=2,
+                    rate=dev_rate,
+                    output=True,
+                    output_device_index=default_out_idx
+                )
+        except Exception as k_err:
+            print(f"Speaker keepalive notice: {k_err}")
+
+        def spk_callback(in_data, frame_count, time_info, status):
+            if not self.is_recording or self.is_paused:
+                return (in_data, pyaudio.paContinue)
+
+            if self.is_speaker_muted:
+                silent_data = b'\x00' * len(in_data)
+                self.speaker_frames.append((silent_data, rate, channels))
+                self.spk_live_chunks.append((in_data, rate, channels))
+                self.speaker_level = 0.0
+            else:
+                self.speaker_frames.append((in_data, rate, channels))
+                self.spk_live_chunks.append((in_data, rate, channels))
+
+                samples = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
+                if len(samples) > 0:
+                    rms = float(np.sqrt(np.mean(samples**2)))
+                    if rms > 1e-4:
+                        db = 20.0 * np.log10(max(rms, 1e-4))
+                        lvl = float(np.clip((db + 60.0) / 60.0 * 100.0, 0.0, 100.0))
+                        self.speaker_level = max(lvl, self.speaker_level * 0.85)
+                    else:
+                        self.speaker_level = self.speaker_level * 0.85
+                else:
+                    self.speaker_level = 0.0
+
+            return (in_data, pyaudio.paContinue)
 
         rate_candidates = [dev_rate, 48000, 44100, 96000]
         channel_candidates = [dev_ch if dev_ch > 0 else 2, 2, 1]
@@ -390,7 +438,8 @@ class DualAudioRecorder:
                         rate=r,
                         input=True,
                         input_device_index=self.speaker_device_index,
-                        frames_per_buffer=chunk
+                        frames_per_buffer=chunk,
+                        stream_callback=spk_callback
                     )
                     rate = r
                     channels = c
@@ -402,47 +451,35 @@ class DualAudioRecorder:
 
         if stream is None:
             print(f"Speaker worker notice: Could not open stream for speaker device {self.speaker_device_index}")
+            if silent_out_stream:
+                try: silent_out_stream.close()
+                except: pass
             return
 
         print(f"Speaker WASAPI loopback stream active on device {self.speaker_device_index} (rate={rate}, ch={channels})")
+        stream.start_stream()
 
         while self.is_recording:
-            if self.is_paused:
-                time.sleep(0.1)
-                continue
-
-            try:
-                data = stream.read(chunk, exception_on_overflow=False)
-                if data:
-                    if self.is_speaker_muted:
-                        silent_data = b'\x00' * len(data)
-                        self.speaker_frames.append((silent_data, rate, channels))
-                        self.spk_live_chunks.append((data, rate, channels))
-                        self.speaker_level = 0.0
-                    else:
-                        self.speaker_frames.append((data, rate, channels))
-                        self.spk_live_chunks.append((data, rate, channels))
-
-                        # Standardized RMS dB decibel calculation (-60 dB to 0 dB -> 0% to 100%)
-                        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-                        if len(samples) > 0:
-                            rms = float(np.sqrt(np.mean(samples**2)))
-                            if rms > 1e-5:
-                                db = 20.0 * np.log10(max(rms, 1e-5))
-                                lvl = (db + 60.0) / 60.0 * 100.0
-                                self.speaker_level = float(np.clip(lvl, 0.0, 100.0))
-                            else:
-                                self.speaker_level = 0.0
-                        else:
-                            self.speaker_level = 0.0
-            except Exception:
-                pass
+            time.sleep(0.1)
+            # Write silent keepalive frames if stream exists
+            if silent_out_stream and not self.is_paused:
+                try:
+                    silent_out_stream.write(b'\x00' * 1024, exception_on_underflow=False)
+                except Exception:
+                    pass
 
         try:
             stream.stop_stream()
             stream.close()
         except Exception:
             pass
+
+        if silent_out_stream:
+            try:
+                silent_out_stream.stop_stream()
+                silent_out_stream.close()
+            except Exception:
+                pass
 
     def _live_transcribe_worker(self):
         """Non-blocking live speech recognition thread using async ThreadPoolExecutor."""
