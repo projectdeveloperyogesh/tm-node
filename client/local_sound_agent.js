@@ -260,6 +260,15 @@ function createDummyWavFile(filePath, durationSec) {
 }
 
 // Start Server
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.warn(`[NodeLocalAgent Notice] Port ${LOCAL_PORT} is already in use by an active sound agent instance.`);
+        console.warn(`[NodeLocalAgent Notice] The web app will connect directly to the active agent at http://127.0.0.1:${LOCAL_PORT}`);
+    } else {
+        console.error(`[NodeLocalAgent Error] Server error:`, err);
+    }
+});
+
 server.listen(LOCAL_PORT, '127.0.0.1', () => {
     console.log('='.repeat(65));
     console.log(` 🟢 TaskPulse Node.js Local Desktop Soundcard Agent Running`);
