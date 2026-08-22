@@ -327,36 +327,38 @@ class MeetingAnalyzer {
 
     async _analyzeYogeshChat(transcriptText, meetingTitle, targetLanguage, audioFilePath = null) {
         try {
-            const prompt = `
-            Analyze the following meeting audio/transcript and extract structured meeting intelligence in ${targetLanguage}.
-            
-            Return ONLY a raw JSON object (no markdown, no backticks) with this exact schema:
-            {
-              "transcript": "Full transcript of what was discussed...",
-              "summary": "Executive summary paragraph in ${targetLanguage}...",
-              "items_discussed": [
-                {
-                  "topic": "Topic Title in ${targetLanguage}",
-                  "details": "Bullet point details in ${targetLanguage}",
-                  "category": "Technical | Decision | Follow-up | Discussion"
-                }
-              ],
-              "tasks": [
-                {
-                  "title": "Action Task Title in ${targetLanguage}",
-                  "description": "Task description in ${targetLanguage}",
-                  "assignee": "Assignee name or Team",
-                  "priority": "High | Medium | Low",
-                  "category": "Technical | Follow-up | Decision",
-                  "dueDate": "Tomorrow",
-                  "subtasks": ["Subtask 1"]
-                }
-              ]
-            }
+            const prompt = `Analyze the following meeting transcript for '${meetingTitle}' and give list of action items, executive summary, and key discussion points in ${targetLanguage}.
 
-            Meeting Title: ${meetingTitle}
-            Transcript: ${transcriptText || "Analyze attached audio recording."}
-            `;
+CRITICAL REQUIREMENT:
+Provide a detailed list of actionable tasks, executive summary, and discussion highlights.
+
+Return ONLY a raw JSON object (no markdown, no backticks) with this exact schema:
+{
+  "transcript": "Full verbatim transcript of what was discussed...",
+  "summary": "Executive summary paragraph in ${targetLanguage}...",
+  "items_discussed": [
+    {
+      "topic": "Topic Title in ${targetLanguage}",
+      "details": "Bullet point details in ${targetLanguage}",
+      "category": "Technical | Decision | Follow-up | Discussion"
+    }
+  ],
+  "tasks": [
+    {
+      "title": "Action Task Title in ${targetLanguage}",
+      "description": "Task description in ${targetLanguage}",
+      "assignee": "Assignee name or Team",
+      "priority": "High | Medium | Low",
+      "category": "Technical | Follow-up | Decision",
+      "due_date": "Tomorrow",
+      "subtasks": ["Subtask 1", "Subtask 2"]
+    }
+  ]
+}
+
+Meeting Title: ${meetingTitle}
+Transcript: ${transcriptText || "Analyze attached audio recording."}
+`;
 
             let fileObjs = [];
             if (audioFilePath && fs.existsSync(audioFilePath)) {
@@ -436,40 +438,49 @@ class MeetingAnalyzer {
                     this._recordAiLog("Yogesh Chat (Port 3005)", meetingTitle, targetLanguage, prompt, reply, enriched, 1500, "success", targetUrl, "POST", payload);
                     return enriched;
                 } catch (parseErr) {
-                    // Smart Section Parser for Yogesh Chat Markdown AI Responses
-                    const sections = reply.split(/###\s*\d*\.?\s*/);
-                    let summaryParts = [];
+                    // Smart Section & Task Parser for Yogesh Chat Markdown AI Responses
+                    const introMatch = reply.split(/(?:###|\-\-\-)/);
+                    const summary = introMatch.length > 0 ? introMatch[0].trim() : reply.substring(0, 400);
+
+                    const taskBlocks = reply.split(/(?:####|###)\s*\d*\.?\s*/);
+                    let tasks = [];
                     let items = [];
 
-                    sections.forEach(sec => {
-                        const secClean = sec.strip ? sec.strip() : sec.trim();
-                        if (!secClean) return;
-                        const headerLine = secClean.split('\n')[0].replace(/\*\*/g, '').replace(/:/g, '').trim();
+                    taskBlocks.forEach((block, idx) => {
+                        const blockClean = block.trim();
+                        if (!blockClean || idx === 0) return;
 
-                        if (/(conclusion|observation|summary|overview|recommendation)/i.test(headerLine)) {
-                            summaryParts.push(secClean);
+                        const lines = blockClean.split('\n');
+                        const titleLine = lines[0].replace(/[\*\#\`:]/g, '').trim();
+                        const bullets = blockClean.match(/(?:[\*\-\•]\s*)([^\n]+)/g) || [];
+                        const descParts = bullets.map(b => b.replace(/[\*\`]/g, '').replace(/^(?:Action|Note):/i, '').trim()).filter(b => b.length > 3);
+                        const desc = descParts.join(' ') || `Follow-up item for ${titleLine}`;
+
+                        if (titleLine && titleLine.length > 3) {
+                            const taskId = `task_${idx}`;
+                            tasks.push({
+                                id: taskId,
+                                title: titleLine,
+                                description: desc,
+                                assignee: "Team",
+                                priority: idx <= 2 ? "High" : "Medium",
+                                category: "Follow-up",
+                                due_date: "Tomorrow",
+                                status: "todo",
+                                subtasks: descParts.slice(0, 4).map((d, i) => ({ id: `sub_${idx}_${i}`, title: d.substring(0, 60), completed: false }))
+                            });
+
+                            items.push({
+                                topic: titleLine,
+                                details: ` • ${desc.substring(0, 120)}`,
+                                category: "Discussion"
+                            });
                         }
-
-                        const bullets = secClean.match(/(?:[\*\-\•]\s*)([^\n]+)/g) || [];
-                        bullets.forEach(b => {
-                            const bClean = b.replace(/[\*\`]/g, '').replace(/^[•\-\*\d+\.]\s*/, '').trim();
-                            if (bClean.length > 5) {
-                                items.push({
-                                    topic: headerLine.length < 40 ? headerLine : "Discussion Highlight",
-                                    details: ` • ${bClean}`,
-                                    category: "Technical"
-                                });
-                            }
-                        });
                     });
 
-                    const fullSummary = summaryParts.length > 0 ? summaryParts.join('\n\n') : reply.substring(0, 500);
-
-                    const fallbackRes = {
-                        summary: fullSummary || `Recorded meeting session for ${meetingTitle}.`,
-                        items_discussed: items.length > 0 ? items.slice(0, 10) : [{ topic: "Meeting Notes", details: ` • ${reply.substring(0, 200)}`, category: "AI Notes" }],
-                        tasks: [{
-                            id: Math.random().toString(36).substring(2, 10),
+                    if (tasks.length === 0) {
+                        tasks.push({
+                            id: "task_1",
                             title: `Follow-up & Review: ${meetingTitle}`,
                             description: "Review generated meeting transcript context and complete assigned action items.",
                             assignee: "Team",
@@ -478,7 +489,13 @@ class MeetingAnalyzer {
                             due_date: "Tomorrow",
                             status: "todo",
                             subtasks: [{ id: "sub_1", title: "Review transcript context", completed: false }]
-                        }],
+                        });
+                    }
+
+                    const fallbackRes = {
+                        summary: summary || `Recorded meeting session for ${meetingTitle}.`,
+                        items_discussed: items.length > 0 ? items.slice(0, 10) : [{ topic: "Meeting Notes", details: ` • ${reply.substring(0, 200)}`, category: "AI Notes" }],
+                        tasks: tasks,
                         transcript: transcriptText || reply,
                         prompt: prompt,
                         curl_command: curlCmd,
